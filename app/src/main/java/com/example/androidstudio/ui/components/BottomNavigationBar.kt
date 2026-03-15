@@ -1,17 +1,23 @@
 package com.example.androidstudio.ui.components
 
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -23,51 +29,98 @@ fun BottomNavigationBar(
     onProfileClick: () -> Unit,
     selectedItem: Int
 ) {
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 12.dp,
-        modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
+        color = Color.White,
+        tonalElevation = 16.dp,
+        shadowElevation = 20.dp
     ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Rounded.Home, contentDescription = "Home") },
-            label = { Text("Home", fontSize = 10.sp) },
-            selected = selectedItem == 0,
-            onClick = onHomeClick,
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF0D3B34),
-                indicatorColor = Color(0xFFF1F8E9)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .height(72.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            NavigationItem(
+                icon = Icons.Rounded.Home,
+                label = "Trang chủ",
+                isSelected = selectedItem == 0,
+                onClick = onHomeClick
             )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Rounded.BarChart, contentDescription = "Stats") },
-            label = { Text("Lịch sử", fontSize = 10.sp) },
-            selected = selectedItem == 1,
-            onClick = onHistoryClick,
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF0D3B34),
-                indicatorColor = Color(0xFFF1F8E9)
+            NavigationItem(
+                icon = Icons.Rounded.History,
+                label = "Lịch sử",
+                isSelected = selectedItem == 1,
+                onClick = onHistoryClick
             )
-        )
-        Spacer(modifier = Modifier.weight(0.4f))
-        NavigationBarItem(
-            icon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = "Learn") },
-            label = { Text("Học", fontSize = 10.sp) },
-            selected = selectedItem == 2,
-            onClick = onKnowledgeClick,
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF0D3B34),
-                indicatorColor = Color(0xFFF1F8E9)
+            
+            // Central Spacer for FAB if needed, but keeping it balanced
+            Spacer(modifier = Modifier.width(48.dp))
+
+            NavigationItem(
+                icon = Icons.AutoMirrored.Rounded.MenuBook,
+                label = "Góc học tập",
+                isSelected = selectedItem == 2,
+                onClick = onKnowledgeClick
             )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Rounded.Person, contentDescription = "Profile") },
-            label = { Text("Hồ sơ", fontSize = 10.sp) },
-            selected = selectedItem == 3,
-            onClick = onProfileClick,
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF0D3B34),
-                indicatorColor = Color(0xFFF1F8E9)
+            NavigationItem(
+                icon = Icons.Rounded.Person,
+                label = "Hồ sơ",
+                isSelected = selectedItem == 3,
+                onClick = onProfileClick
             )
-        )
+        }
+    }
+}
+
+@Composable
+fun RowScope.NavigationItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val primaryColor = Color(0xFF0D3B34)
+    val inactiveColor = Color.Gray
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) Color(0xFFF1F8E9) else Color.Transparent),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = if (isSelected) primaryColor else inactiveColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            if (isSelected) {
+                Text(
+                    text = label,
+                    fontSize = 10.sp,
+                    color = primaryColor,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
     }
 }

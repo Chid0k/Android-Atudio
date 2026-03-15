@@ -3,11 +3,7 @@ package com.example.androidstudio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -29,27 +25,100 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = "login") {
-        composable("login") { 
+        composable("login") {
             LoginScreen(
                 onLoginSuccess = { navController.navigate("home") },
-                onNavigateToRegister = { /* Navigate to register */ }
+                onNavigateToRegister = { navController.navigate("register") },
+                onNavigateToForgotPassword = { navController.navigate("forgot_password") }
             )
         }
-        composable("home") { 
-            HomeScreen(
-                onNavigateToProfile = { navController.navigate("profile") }
-            ) 
-        }
-        composable("profile") { 
-            ProfileScreen(
+        composable("register") {
+            RegisterScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToEdit = { navController.navigate("edit_profile") }
-            ) 
+                onRegisterSuccess = { navController.navigate("login") },
+                onNavigateToLogin = { navController.navigate("login") }
+            )
         }
-        composable("edit_profile") { 
+        composable("forgot_password") {
+            ForgotPasswordScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSendVerification = { navController.navigate("otp") }
+            )
+        }
+        composable("otp") {
+            OTPScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onVerifyOTP = { navController.navigate("reset_password") }
+            )
+        }
+        composable("reset_password") {
+            ResetPasswordScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onConfirmReset = { navController.navigate("login") }
+            )
+        }
+        composable("home") {
+            HomeScreen(
+                onNavigateToProfile = { navController.navigate("profile") },
+                onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
+                onNavigateToHistory = { navController.navigate("history") },
+                onNavigateToKnowledge = { navController.navigate("knowledge") }
+            )
+        }
+        composable("knowledge") {
+            KnowledgeScreen(
+                onNavigateToHome = { navController.navigate("home") },
+                onNavigateToHistory = { navController.navigate("history") },
+                onNavigateToProfile = { navController.navigate("profile") },
+                onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
+                onNavigateToArticle = { navController.navigate("article_detail") }
+            )
+        }
+        composable("article_detail") {
+            ArticleDetailScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable("interview_setup") {
+            InterviewSetupScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onStartInterview = { navController.navigate("interview") }
+            )
+        }
+        composable("interview") {
+            InterviewScreen(
+                onEndInterview = { navController.navigate("result") }
+            )
+        }
+        composable("result") {
+            ResultAnalysisScreen(
+                onNavigateBack = { navController.navigate("home") {
+                    popUpTo("home") { inclusive = true }
+                } }
+            )
+        }
+        composable("history") {
+            HistoryScreen(
+                onNavigateToHome = { navController.navigate("home") },
+                onNavigateToKnowledge = { navController.navigate("knowledge") },
+                onNavigateToProfile = { navController.navigate("profile") },
+                onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
+                onNavigateToResult = { navController.navigate("result") }
+            )
+        }
+        composable("profile") {
+            ProfileScreen(
+                onNavigateToHome = { navController.navigate("home") },
+                onNavigateToHistory = { navController.navigate("history") },
+                onNavigateToKnowledge = { navController.navigate("knowledge") },
+                onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
+                onNavigateToEdit = { navController.navigate("edit_profile") }
+            )
+        }
+        composable("edit_profile") {
             EditProfileScreen(
                 onNavigateBack = { navController.popBackStack() }
-            ) 
+            )
         }
     }
 }

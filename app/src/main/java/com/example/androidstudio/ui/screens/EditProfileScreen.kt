@@ -63,7 +63,6 @@ fun EditProfileScreen(onNavigateBack: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditField(label: String, value: String, onValueChange: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -74,7 +73,7 @@ fun EditField(label: String, value: String, onValueChange: (String) -> Unit) {
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.outlinedTextFieldColors(
+            colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF0D3B34),
                 unfocusedBorderColor = Color.LightGray
             )

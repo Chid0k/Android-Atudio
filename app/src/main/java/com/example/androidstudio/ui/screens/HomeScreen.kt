@@ -20,19 +20,33 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidstudio.ui.components.BottomNavigationBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onNavigateToProfile: () -> Unit) {
+fun HomeScreen(
+    onNavigateToProfile: () -> Unit,
+    onNavigateToInterviewSetup: () -> Unit,
+    onNavigateToHistory: () -> Unit,
+    onNavigateToKnowledge: () -> Unit
+) {
     Scaffold(
-        bottomBar = { BottomNavigationBar(onNavigateToProfile) },
+        bottomBar = { 
+            BottomNavigationBar(
+                onHomeClick = {},
+                onHistoryClick = onNavigateToHistory,
+                onKnowledgeClick = onNavigateToKnowledge,
+                onProfileClick = onNavigateToProfile,
+                selectedItem = 0
+            ) 
+        },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* Start new interview */ },
+                onClick = onNavigateToInterviewSetup,
                 containerColor = Color(0xFFCCFF90),
                 contentColor = Color.Black,
                 shape = CircleShape,
-                modifier = Modifier.offset(y = 50.dp) // Adjustment for custom floating look
+                modifier = Modifier.offset(y = 50.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
             }
@@ -50,9 +64,9 @@ fun HomeScreen(onNavigateToProfile: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
                 StatCards()
                 Spacer(modifier = Modifier.height(24.dp))
-                StartInterviewBanner()
+                StartInterviewBanner(onNavigateToInterviewSetup)
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader(title = "Gần đây", onSeeAllClick = {})
+                SectionHeader(title = "Gần đây", onSeeAllClick = onNavigateToHistory)
             }
             
             items(recentInterviews) { interview ->
@@ -119,7 +133,7 @@ fun StatCard(modifier: Modifier, icon: ImageVector, label: String, value: String
         shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = Color(0xFF0E3C3E), modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = label, fontSize = 12.sp, color = Color.Gray)
             Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -128,7 +142,7 @@ fun StatCard(modifier: Modifier, icon: ImageVector, label: String, value: String
 }
 
 @Composable
-fun StartInterviewBanner() {
+fun StartInterviewBanner(onStartClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -157,7 +171,7 @@ fun StartInterviewBanner() {
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 Button(
-                    onClick = { /* TODO */ },
+                    onClick = onStartClick,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCCFF90)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -214,40 +228,6 @@ fun InterviewHistoryItem(interview: InterviewHistory) {
         }
         
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
-    }
-}
-
-@Composable
-fun BottomNavigationBar(onProfileClick: () -> Unit) {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
-    ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-            label = { Text("Home") },
-            selected = true,
-            onClick = { }
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.BarChart, contentDescription = "Stats") },
-            label = { Text("Stats") },
-            selected = false,
-            onClick = { }
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Book, contentDescription = "Learn") },
-            label = { Text("Learn") },
-            selected = false,
-            onClick = { }
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-            label = { Text("Profile") },
-            selected = false,
-            onClick = onProfileClick
-        )
     }
 }
 
