@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,16 +20,35 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidstudio.network.RetrofitClient
+import com.example.androidstudio.network.UserProfile
 import com.example.androidstudio.ui.components.BottomNavigationBar
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    userId: Int?,
     onNavigateToProfile: () -> Unit,
     onNavigateToInterviewSetup: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToKnowledge: () -> Unit
 ) {
+    var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            scope.launch {
+                try {
+                    userProfile = RetrofitClient.apiService.getUserProfile(userId)
+                } catch (e: Exception) {
+                    // Silent fail or handle error if needed
+                }
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = { 
             BottomNavigationBar(
@@ -60,7 +79,7 @@ fun HomeScreen(
                 .padding(horizontal = 20.dp)
         ) {
             item {
-                HomeHeader(onNavigateToProfile)
+                HomeHeader(userProfile, onNavigateToProfile)
                 Spacer(modifier = Modifier.height(24.dp))
                 StatCards()
                 Spacer(modifier = Modifier.height(24.dp))
@@ -77,7 +96,7 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeHeader(onProfileClick: () -> Unit) {
+fun HomeHeader(userProfile: UserProfile?, onProfileClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -89,19 +108,29 @@ fun HomeHeader(onProfileClick: () -> Unit) {
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(Color.LightGray)
+                .background(Color(0xFFE8F5E9))
                 .clickable { onProfileClick() }
         ) {
             Icon(
                 Icons.Default.Person, 
                 contentDescription = "Profile",
-                modifier = Modifier.align(Alignment.Center)
+                modifier = Modifier.align(Alignment.Center),
+                tint = Color(0xFF0D3B34)
             )
         }
         
         Column(horizontalAlignment = Alignment.End) {
-            Text(text = "Chính Đỗ", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(text = "Pen tester", color = Color.Gray, fontSize = 14.sp)
+            Text(
+                text = userProfile?.full_name ?: "Người dùng", 
+                fontWeight = FontWeight.Bold, 
+                fontSize = 18.sp,
+                color = Color(0xFF2C3E50)
+            )
+            Text(
+                text = userProfile?.major ?: "Chưa cập nhật hồ sơ", 
+                color = Color.Gray, 
+                fontSize = 14.sp
+            )
         }
     }
 }

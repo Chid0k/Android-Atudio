@@ -88,6 +88,7 @@ fun MainApp() {
         }
         composable("home") {
             HomeScreen(
+                userId = loggedInUserId,
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
                 onNavigateToHistory = { navController.navigate("history") },

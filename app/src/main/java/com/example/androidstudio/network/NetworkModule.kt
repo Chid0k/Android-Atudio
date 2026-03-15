@@ -4,10 +4,21 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.http.*
+
+@Serializable
+data class CVResponse(
+    val id: Int? = null,
+    val user_id: Int? = null,
+    val filename: String,
+    val file_url: String,
+    val created_at: String? = null
+)
 
 object NetworkConfig {
     const val BASE_URL = "http://192.168.0.104:8000"
@@ -52,7 +63,9 @@ data class UserProfile(
     val full_name: String? = null,
     val major: String? = null,
     val experience: String? = null,
-    val skills: String? = null
+    val skills: String? = null,
+    val cv_url: String? = null,
+    val cv_filename: String? = null
 )
 
 @Serializable
@@ -62,6 +75,12 @@ data class ProfileUpdateRequest(
     val major: String,
     val experience: String,
     val skills: String
+)
+
+@Serializable
+data class UploadCVResponse(
+    val filename: String,
+    val file_url: String
 )
 
 interface ApiService {
@@ -79,6 +98,16 @@ interface ApiService {
 
     @PATCH("/api/v1/profiles/{user_id}")
     suspend fun updateProfile(@Path("user_id") userId: Int, @Body request: ProfileUpdateRequest): UserProfile
+
+    @Multipart
+    @POST("/api/v1/users/{user_id}/cv")
+    suspend fun uploadCV(
+        @Path("user_id") userId: Int,
+        @Part file: MultipartBody.Part
+    ): UploadCVResponse
+
+    @GET("/api/v1/users/{user_id}/cv")
+    suspend fun getCVList(@Path("user_id") userId: Int): List<CVResponse>
 }
 
 object RetrofitClient {

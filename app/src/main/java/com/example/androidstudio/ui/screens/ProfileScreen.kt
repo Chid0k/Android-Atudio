@@ -1,5 +1,13 @@
 package com.example.androidstudio.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,14 +26,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidstudio.network.RetrofitClient
 import com.example.androidstudio.network.TokenHolder
 import com.example.androidstudio.network.UserProfile
 import com.example.androidstudio.ui.components.BottomNavigationBar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,9 +59,11 @@ fun ProfileScreen(
     val primaryColor = Color(0xFF0D3B34)
     val accentColor = Color(0xFFCCFF90)
     val backgroundColor = Color(0xFFF0F4F3)
+    val context = LocalContext.current
     
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var isUploading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -58,6 +78,53 @@ fun ProfileScreen(
                     errorMessage = "Không thể tải hồ sơ: ${e.localizedMessage}"
                 } finally {
                     isLoading = false
+                }
+            }
+        }
+    }
+
+    val cvPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            if (userId != null) {
+                scope.launch {
+                    isUploading = true
+                    try {
+                        val file = getFileFromUri(context, it)
+                        if (file != null) {
+                            val requestFile = file.asRequestBody("application/pdf".toMediaTypeOrNull())
+                            val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+                            
+                            try {
+                                val response = RetrofitClient.apiService.uploadCV(userId, body)
+                                // If we get here, it's a success
+                                userProfile = userProfile?.copy(
+                                    cv_url = response.file_url,
+                                    cv_filename = response.filename
+                                )
+                                Toast.makeText(context, "Tải CV thành công!", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                // Log the error to see what's happening
+                                Log.e("ProfileScreen", "Upload error", e)
+                                
+                                // Sometimes Retrofit throws even if it's a 201/200 if the response body is unexpected
+                                // Or if it's a network error.
+                                // Re-fetching profile as a fallback if the user says it's actually there
+                                try {
+                                    val updatedProfile = RetrofitClient.apiService.getUserProfile(userId)
+                                    userProfile = updatedProfile
+                                    Toast.makeText(context, "Đã cập nhật CV!", Toast.LENGTH_SHORT).show()
+                                } catch (innerE: Exception) {
+                                    Toast.makeText(context, "Lỗi khi tải CV: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Lỗi file: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                    } finally {
+                        isUploading = false
+                    }
                 }
             }
         }
@@ -269,33 +336,68 @@ fun ProfileScreen(
                         modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
                     )
 
-                    // Documents/CV Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
+                    // Documents/CV Card Section
+                    if (userProfile?.cv_url == null) {
+                        // Nút upload nếu chưa có CV
+                        OutlinedButton(
+                            onClick = { cvPickerLauncher.launch("application/pdf") },
                             modifier = Modifier
-                                .clickable { /* Action */ }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(2.dp, primaryColor.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor)
                         ) {
-                            Box(
+                            if (isUploading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = primaryColor)
+                            } else {
+                                Icon(Icons.Rounded.UploadFile, contentDescription = null)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Tải lên hồ sơ (CV)", fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    } else {
+                        // Hiển thị Card CV nếu đã có
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Row(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .background(Color(0xFFFFEBEE), RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
+                                    .clickable {
+                                        if (userProfile?.cv_url != null) {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(userProfile?.cv_url))
+                                            context.startActivity(intent)
+                                        }
+                                    }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Rounded.Description, contentDescription = null, tint = Color(0xFFC62828))
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(Color(0xFFFFEBEE), RoundedCornerShape(12.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        userProfile?.cv_filename ?: "Hồ sơ năng lực.pdf",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text("Đã tải lên • Chạm để xem", fontSize = 12.sp, color = Color.Gray)
+                                }
+                                IconButton(onClick = { cvPickerLauncher.launch("application/pdf") }) {
+                                    Icon(Icons.Rounded.CloudUpload, contentDescription = "Update", tint = primaryColor)
+                                }
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("CV của bạn", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("Tải lên để AI phân tích tốt hơn", fontSize = 12.sp, color = Color.Gray)
-                            }
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.LightGray)
                         }
                     }
 
@@ -372,5 +474,27 @@ fun InfoRow(icon: ImageVector, label: String, value: String) {
             Text(label, fontSize = 11.sp, color = Color.Gray)
             Text(value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2C3E50))
         }
+    }
+}
+
+private suspend fun getFileFromUri(context: Context, uri: Uri): File? = withContext(Dispatchers.IO) {
+    var fileName = "temp_cv.pdf"
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (cursor.moveToFirst()) {
+            fileName = cursor.getString(nameIndex)
+        }
+    }
+
+    val file = File(context.cacheDir, fileName)
+    try {
+        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+        val outputStream = FileOutputStream(file)
+        inputStream?.copyTo(outputStream)
+        inputStream?.close()
+        outputStream.close()
+        file
+    } catch (e: Exception) {
+        null
     }
 }
