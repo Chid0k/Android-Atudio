@@ -13,17 +13,23 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.androidstudio.network.LoginRequest
+import com.example.androidstudio.network.RetrofitClient
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (Int) -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var showGoogleLogin by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -65,9 +71,10 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Tài khoản") },
+                    label = { Text("Email") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -82,6 +89,14 @@ fun LoginScreen(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
                 TextButton(
                     onClick = onNavigateToForgotPassword,
                     modifier = Modifier.align(Alignment.End)
@@ -92,16 +107,36 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = {
+                        scope.launch {
+                            isLoading = true
+                            errorMessage = null
+                            try {
+                                val response = RetrofitClient.apiService.login(
+                                    LoginRequest(email, password)
+                                )
+                                onLoginSuccess(response.user_id)
+                            } catch (e: Exception) {
+                                errorMessage = "Đăng nhập thất bại: ${e.localizedMessage}"
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF0E3C3E)
                     )
                 ) {
-                    Text("Đăng nhập", fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Đăng nhập", fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -109,7 +144,7 @@ fun LoginScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HorizontalDivider(modifier = Modifier.weight(1f))
                     Text(
-                        " hoặc đăng nhập với ",
+                        " hoặc ",
                         modifier = Modifier.padding(horizontal = 8.dp),
                         fontSize = 12.sp,
                         color = Color.Gray
@@ -120,13 +155,13 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedButton(
-                    onClick = { showGoogleLogin = true },
+                    onClick = onNavigateToRegister,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Tiếp tục với Google", color = Color.Black)
+                    Text("Đăng ký tài khoản", color = Color(0xFF0E3C3E))
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -141,16 +176,6 @@ fun LoginScreen(
                         )
                     }
                 }
-            }
-
-            if (showGoogleLogin) {
-                GoogleLoginScreen(
-                    onDismiss = { showGoogleLogin = false },
-                    onAccountSelected = {
-                        showGoogleLogin = false
-                        onLoginSuccess()
-                    }
-                )
             }
         }
     }

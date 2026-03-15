@@ -3,7 +3,7 @@ package com.example.androidstudio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -24,10 +24,17 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
+    var loggedInUserId by remember { mutableStateOf<Int?>(null) }
+
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { navController.navigate("home") },
+                onLoginSuccess = { userId ->
+                    loggedInUserId = userId
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
                 onNavigateToRegister = { navController.navigate("register") },
                 onNavigateToForgotPassword = { navController.navigate("forgot_password") }
             )
@@ -108,6 +115,7 @@ fun MainApp() {
         }
         composable("profile") {
             ProfileScreen(
+                userId = loggedInUserId,
                 onNavigateToHome = { navController.navigate("home") },
                 onNavigateToHistory = { navController.navigate("history") },
                 onNavigateToKnowledge = { navController.navigate("knowledge") },
