@@ -6,13 +6,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -26,22 +27,61 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidstudio.network.KnowledgeArticle
+import com.example.androidstudio.network.RetrofitClient
 import com.example.androidstudio.ui.components.BottomNavigationBar
+import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeScreen(
+    userId: Int?,
     onNavigateToHome: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToInterviewSetup: () -> Unit,
-    onNavigateToArticle: () -> Unit
+    onNavigateToArticle: (Int) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    
+    var articles by remember { mutableStateOf<List<KnowledgeArticle>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showUploadCVPrompt by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val primaryColor = Color(0xFF0D3B34)
     val backgroundColor = Color(0xFFF8FAF9)
+
+    fun loadArticles() {
+        if (userId != null) {
+            scope.launch {
+                isLoading = true
+                errorMessage = null
+                showUploadCVPrompt = false
+                try {
+                    val response = RetrofitClient.apiService.getArticles(userId)
+                    articles = response.articles
+                } catch (e: HttpException) {
+                    if (e.code() == 404) {
+                        showUploadCVPrompt = true
+                    } else {
+                        errorMessage = "Lỗi khi tải bài viết: ${e.localizedMessage}"
+                    }
+                } catch (e: Exception) {
+                    errorMessage = "Lỗi khi tải bài viết: ${e.localizedMessage}"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(userId) {
+        loadArticles()
+    }
 
     Scaffold(
         bottomBar = {
@@ -139,10 +179,61 @@ fun KnowledgeScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            if (selectedTab == 0) {
-                KnowledgeContent(onNavigateToArticle)
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = primaryColor)
+                }
+            } else if (showUploadCVPrompt) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CloudUpload,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = primaryColor
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Bạn chưa tải CV lên",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = primaryColor
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Hãy tải CV để chúng tôi gợi ý các bài viết phù hợp nhất cho bạn.",
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = onNavigateToProfile,
+                            colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Tải CV ngay")
+                        }
+                    }
+                }
+            } else if (errorMessage != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { loadArticles() }) {
+                            Text("Thử lại")
+                        }
+                    }
+                }
             } else {
-                ClothingContent()
+                if (selectedTab == 0) {
+                    KnowledgeContent(articles, searchQuery, onNavigateToArticle)
+                } else {
+                    ClothingContent()
+                }
             }
         }
     }
@@ -179,33 +270,51 @@ fun ModernTabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifi
 }
 
 @Composable
-fun KnowledgeContent(onNavigateToArticle: () -> Unit) {
+fun KnowledgeContent(articles: List<KnowledgeArticle>, searchQuery: String, onNavigateToArticle: (Int) -> Unit) {
+    val filteredArticlesWithIndices = if (searchQuery.isEmpty()) {
+        articles.mapIndexed { index, article -> index to article }
+    } else {
+        articles.mapIndexed { index, article -> index to article }.filter { (_, article) ->
+            article.title.contains(searchQuery, ignoreCase = true) || 
+            article.description.contains(searchQuery, ignoreCase = true) 
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            FeaturedLearningCard(
-                title = "Phương pháp STAR",
-                desc = "Làm chủ kỹ thuật kể chuyện trong phỏng vấn",
-                icon = Icons.Rounded.AutoAwesome,
-                onClick = onNavigateToArticle
-            )
-        }
-        
-        item {
-            Text(
-                "Phổ biến nhất",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color(0xFF0D3B34),
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
+        if (filteredArticlesWithIndices.isNotEmpty()) {
+            val (firstIndex, firstArticle) = filteredArticlesWithIndices.first()
+            item {
+                FeaturedLearningCard(
+                    title = firstArticle.title,
+                    desc = firstArticle.description,
+                    icon = Icons.Rounded.AutoAwesome,
+                    onClick = { onNavigateToArticle(firstIndex) }
+                )
+            }
+            
+            item {
+                Text(
+                    "Tất cả bài viết",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF0D3B34),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
 
-        items(knowledgeArticles) { article ->
-            EnhancedKnowledgeItem(article, onClick = onNavigateToArticle)
+            itemsIndexed(filteredArticlesWithIndices.drop(1)) { _, (index, article) ->
+                EnhancedKnowledgeItem(article, onClick = { onNavigateToArticle(index) })
+            }
+        } else {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    Text("Không tìm thấy bài viết nào", color = Color.Gray)
+                }
+            }
         }
     }
 }
@@ -236,7 +345,7 @@ fun FeaturedLearningCard(title: String, desc: String, icon: ImageVector, onClick
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        "HOT COURSE",
+                        "BÀI VIẾT MỚI",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -264,157 +373,123 @@ fun FeaturedLearningCard(title: String, desc: String, icon: ImageVector, onClick
 }
 
 @Composable
-fun EnhancedKnowledgeItem(article: Article, onClick: () -> Unit) {
-    Surface(
+fun EnhancedKnowledgeItem(article: KnowledgeArticle, onClick: () -> Unit) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFFF1F8E9)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(article.icon, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(28.dp))
+                Icon(
+                    Icons.AutoMirrored.Rounded.MenuBook,
+                    contentDescription = null,
+                    tint = Color(0xFF0D3B34)
+                )
             }
+            
             Spacer(modifier = Modifier.width(16.dp))
+            
             Column(modifier = Modifier.weight(1f)) {
-                Text(article.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                Text(article.description, color = Color.Gray, fontSize = 13.sp, maxLines = 1)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Schedule, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(14.dp))
-                    Text(" 5 phút đọc", fontSize = 11.sp, color = Color.LightGray)
-                }
+                Text(
+                    article.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF0D3B34)
+                )
+                Text(
+                    article.description,
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    maxLines = 1
+                )
             }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.LightGray)
+            
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = Color.LightGray
+            )
         }
     }
 }
 
 @Composable
 fun ClothingContent() {
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .verticalScroll(scrollState)
+            .padding(start = 20.dp, end = 20.dp, bottom = 100.dp)
     ) {
-        // Tip Box
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+        Text(
+            "Trang phục chuyên nghiệp",
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
             color = Color(0xFF0D3B34)
-        ) {
-            Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Lightbulb, contentDescription = null, tint = Color(0xFFC8E6C9), modifier = Modifier.size(32.dp))
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    "Trang phục phù hợp giúp bạn tự tin hơn 40% trong buổi phỏng vấn.",
-                    fontSize = 14.sp,
-                    color = Color.White,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-        
-        Text("Gợi ý theo ngành nghề", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF0D3B34))
+        )
         Spacer(modifier = Modifier.height(16.dp))
         
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ModernCategoryCard(Modifier.weight(1f), "Công nghệ", Icons.Rounded.Terminal, Color(0xFFE3F2FD))
-            ModernCategoryCard(Modifier.weight(1f), "Kinh doanh", Icons.Rounded.BusinessCenter, Color(0xFFFFF3E0))
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
+        ClothingCard(
+            title = "Dành cho Nam",
+            items = listOf("Sơ mi trắng/xanh nhạt", "Quần tây tối màu", "Giày tây đánh bóng", "Caravat (tùy chọn)"),
+            icon = Icons.Rounded.Person
+        )
         
-        Text("Tác phong chuyên nghiệp", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF0D3B34))
         Spacer(modifier = Modifier.height(16.dp))
         
-        ProfessionTipCard(
-            title = "Nụ cười & Ánh mắt",
-            desc = "Duy trì eye-contact tự nhiên",
-            icon = Icons.Rounded.SentimentSatisfiedAlt,
-            color = Color(0xFFF1F8E9)
+        ClothingCard(
+            title = "Dành cho Nữ",
+            items = listOf("Áo sơ mi/Blouse thanh lịch", "Chân váy chữ A/Quần tây", "Giày cao gót vừa phải", "Trang điểm nhẹ nhàng"),
+            icon = Icons.Rounded.PersonOutline
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        ProfessionTipCard(
-            title = "Tư thế ngồi",
-            desc = "Thẳng lưng, hơi hướng về phía trước",
-            icon = Icons.Rounded.AccessibilityNew,
-            color = Color(0xFFE8EAF6)
-        )
-        
-        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 
 @Composable
-fun ModernCategoryCard(modifier: Modifier, title: String, icon: ImageVector, bgColor: Color) {
-    Card(
-        modifier = modifier.height(120.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp).fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp).background(bgColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = Color(0xFF0D3B34), modifier = Modifier.size(24.dp))
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D3B34))
-        }
-    }
-}
-
-@Composable
-fun ProfessionTipCard(title: String, desc: String, icon: ImageVector, color: Color) {
+fun ClothingCard(title: String, items: List<String>, icon: ImageVector) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(color, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = Color(0xFF0D3B34))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(desc, color = Color.Gray, fontSize = 13.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            items.forEach { item ->
+                Row(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF0D3B34))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(item, fontSize = 14.sp, color = Color.DarkGray)
+                }
             }
         }
     }
 }
-
-data class Article(val title: String, val description: String, val icon: ImageVector)
-
-val knowledgeArticles = listOf(
-    Article("Bí quyết trả lời tình huống", "Sử dụng cấu trúc STAR chuyên nghiệp", Icons.Rounded.AutoStories),
-    Article("5 câu hỏi nên hỏi NTD", "Thể hiện sự quan tâm tinh tế", Icons.Rounded.Groups),
-    Article("Kỹ năng đàm phán lương", "Cách đề xuất mức lương mong muốn", Icons.Rounded.Payments),
-    Article("Chuẩn bị tâm lý", "Giữ bình tĩnh trước áp lực", Icons.Rounded.SelfImprovement)
-)

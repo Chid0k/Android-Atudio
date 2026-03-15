@@ -1,6 +1,7 @@
 package com.example.androidstudio.network
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -15,9 +16,34 @@ import retrofit2.http.*
 data class CVResponse(
     val id: Int? = null,
     val user_id: Int? = null,
-    val filename: String,
-    val file_url: String,
+    val filename: String? = null,
+    val file_url: String? = null,
+    val cv_path: String? = null,
     val created_at: String? = null
+)
+
+@Serializable
+data class KnowledgeArticle(
+    @SerialName("Header") val title: String,
+    @SerialName("Content") val content: String,
+    val description: String = "",
+    val id: Int? = null,
+    val category: String? = null,
+    val created_at: String? = null
+)
+
+@Serializable
+data class ArticlesResponse(
+    val user_id: Int,
+    val articles_path: String? = null,
+    val articles: List<KnowledgeArticle>
+)
+
+@Serializable
+data class ArticleDetailResponse(
+    val user_id: Int,
+    val article_index: Int,
+    val article: KnowledgeArticle
 )
 
 object NetworkConfig {
@@ -79,8 +105,9 @@ data class ProfileUpdateRequest(
 
 @Serializable
 data class UploadCVResponse(
-    val filename: String,
-    val file_url: String
+    val filename: String? = null,
+    val file_url: String? = null,
+    val cv_path: String? = null
 )
 
 interface ApiService {
@@ -108,6 +135,15 @@ interface ApiService {
 
     @GET("/api/v1/users/{user_id}/cv")
     suspend fun getCVList(@Path("user_id") userId: Int): List<CVResponse>
+
+    @GET("/api/v1/users/{user_id}/articles")
+    suspend fun getArticles(@Path("user_id") userId: Int): ArticlesResponse
+
+    @GET("/api/v1/users/{user_id}/articles/{article_index}")
+    suspend fun getArticleDetail(
+        @Path("user_id") userId: Int,
+        @Path("article_index") articleIndex: Int
+    ): ArticleDetailResponse
 }
 
 object RetrofitClient {

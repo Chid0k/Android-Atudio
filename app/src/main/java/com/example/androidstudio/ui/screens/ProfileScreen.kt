@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidstudio.network.CVResponse
 import com.example.androidstudio.network.RetrofitClient
 import com.example.androidstudio.network.TokenHolder
 import com.example.androidstudio.network.UserProfile
@@ -62,25 +63,34 @@ fun ProfileScreen(
     val context = LocalContext.current
     
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var cvList by remember { mutableStateOf<List<CVResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var isUploading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(userId) {
+    fun loadData() {
         if (userId != null) {
             scope.launch {
                 isLoading = true
                 errorMessage = null
                 try {
-                    userProfile = RetrofitClient.apiService.getUserProfile(userId)
+                    val profileDeferred = RetrofitClient.apiService.getUserProfile(userId)
+                    val cvsDeferred = RetrofitClient.apiService.getCVList(userId)
+                    
+                    userProfile = profileDeferred
+                    cvList = cvsDeferred
                 } catch (e: Exception) {
-                    errorMessage = "Không thể tải hồ sơ: ${e.localizedMessage}"
+                    errorMessage = "Không thể tải dữ liệu: ${e.localizedMessage}"
                 } finally {
                     isLoading = false
                 }
             }
         }
+    }
+
+    LaunchedEffect(userId) {
+        loadData()
     }
 
     val cvPickerLauncher = rememberLauncherForActivityResult(
@@ -97,27 +107,15 @@ fun ProfileScreen(
                             val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
                             
                             try {
-                                val response = RetrofitClient.apiService.uploadCV(userId, body)
-                                // If we get here, it's a success
-                                userProfile = userProfile?.copy(
-                                    cv_url = response.file_url,
-                                    cv_filename = response.filename
-                                )
+                                RetrofitClient.apiService.uploadCV(userId, body)
                                 Toast.makeText(context, "Tải CV thành công!", Toast.LENGTH_SHORT).show()
+                                // Reload everything to ensure UI is in sync with backend
+                                loadData()
                             } catch (e: Exception) {
-                                // Log the error to see what's happening
                                 Log.e("ProfileScreen", "Upload error", e)
-                                
-                                // Sometimes Retrofit throws even if it's a 201/200 if the response body is unexpected
-                                // Or if it's a network error.
-                                // Re-fetching profile as a fallback if the user says it's actually there
-                                try {
-                                    val updatedProfile = RetrofitClient.apiService.getUserProfile(userId)
-                                    userProfile = updatedProfile
-                                    Toast.makeText(context, "Đã cập nhật CV!", Toast.LENGTH_SHORT).show()
-                                } catch (innerE: Exception) {
-                                    Toast.makeText(context, "Lỗi khi tải CV: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                }
+                                // Fallback re-fetch
+                                loadData()
+                                Toast.makeText(context, "Đã cập nhật hồ sơ!", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } catch (e: Exception) {
@@ -162,26 +160,14 @@ fun ProfileScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = {
-                        if (userId != null) {
-                            scope.launch {
-                                isLoading = true
-                                errorMessage = null
-                                try {
-                                    userProfile = RetrofitClient.apiService.getUserProfile(userId)
-                                } catch (e: Exception) {
-                                    errorMessage = "Không thể tải hồ sơ: ${e.localizedMessage}"
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
-                        }
-                    }) {
+                    Button(onClick = { loadData() }) {
                         Text("Thử lại")
                     }
                 }
             }
         } else {
+            val latestCV = cvList.lastOrNull()
+            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -336,9 +322,9 @@ fun ProfileScreen(
                         modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
                     )
 
-                    // Documents/CV Card Section
-                    if (userProfile?.cv_url == null) {
-                        // Nút upload nếu chưa có CV
+                    // Documents/CV Card Section based on cvList from API
+                    if (latestCV == null) {
+                        // Nút upload nếu chưa có CV trong danh sách trả về từ API
                         OutlinedButton(
                             onClick = { cvPickerLauncher.launch("application/pdf") },
                             modifier = Modifier
@@ -357,7 +343,7 @@ fun ProfileScreen(
                             }
                         }
                     } else {
-                        // Hiển thị Card CV nếu đã có
+                        // Hiển thị Card CV nếu API trả về danh sách có CV
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
@@ -367,10 +353,8 @@ fun ProfileScreen(
                             Row(
                                 modifier = Modifier
                                     .clickable {
-                                        if (userProfile?.cv_url != null) {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(userProfile?.cv_url))
-                                            context.startActivity(intent)
-                                        }
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(latestCV.file_url ?: ""))
+                                        context.startActivity(intent)
                                     }
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -381,12 +365,16 @@ fun ProfileScreen(
                                         .background(Color(0xFFFFEBEE), RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                                    if (isUploading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFFC62828), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                                    }
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        userProfile?.cv_filename ?: "Hồ sơ năng lực.pdf",
+                                        latestCV.filename ?: "Tài liệu không tên",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,

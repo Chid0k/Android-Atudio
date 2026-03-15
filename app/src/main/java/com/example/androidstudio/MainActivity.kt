@@ -97,15 +97,22 @@ fun MainApp() {
         }
         composable("knowledge") {
             KnowledgeScreen(
+                userId = loggedInUserId,
                 onNavigateToHome = { navController.navigate("home") },
                 onNavigateToHistory = { navController.navigate("history") },
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
-                onNavigateToArticle = { navController.navigate("article_detail") }
+                onNavigateToArticle = { index -> navController.navigate("article_detail/$index") }
             )
         }
-        composable("article_detail") {
+        composable(
+            route = "article_detail/{articleIndex}",
+            arguments = listOf(navArgument("articleIndex") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val articleIndex = backStackEntry.arguments?.getInt("articleIndex")
             ArticleDetailScreen(
+                userId = loggedInUserId,
+                articleIndex = articleIndex,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
