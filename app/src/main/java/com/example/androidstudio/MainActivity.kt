@@ -4,9 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.androidstudio.ui.screens.*
 import com.example.androidstudio.ui.theme.InterviewAppTheme
 
@@ -35,6 +37,12 @@ fun MainApp() {
                         popUpTo("login") { inclusive = true }
                     }
                 },
+                onNavigateToCreateProfile = { userId ->
+                    loggedInUserId = userId
+                    navController.navigate("create_profile/$userId") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
                 onNavigateToRegister = { navController.navigate("register") },
                 onNavigateToForgotPassword = { navController.navigate("forgot_password") }
             )
@@ -44,6 +52,20 @@ fun MainApp() {
                 onNavigateBack = { navController.popBackStack() },
                 onRegisterSuccess = { navController.navigate("login") },
                 onNavigateToLogin = { navController.navigate("login") }
+            )
+        }
+        composable(
+            route = "create_profile/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getInt("userId") ?: 0
+            CreateProfileScreen(
+                userId = userId,
+                onCreateSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("create_profile/{userId}") { inclusive = true }
+                    }
+                }
             )
         }
         composable("forgot_password") {

@@ -7,13 +7,14 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import retrofit2.http.Body
-import retrofit2.http.GET
-import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.*
 
 object NetworkConfig {
     const val BASE_URL = "http://192.168.0.104:8000"
+}
+
+object TokenHolder {
+    var token: String? = null
 }
 
 @Serializable
@@ -24,7 +25,9 @@ data class LoginRequest(
 
 @Serializable
 data class LoginResponse(
-    val user_id: Int
+    val user_id: Int,
+    val access_token: String? = null,
+    val token_type: String? = null
 )
 
 @Serializable
@@ -44,8 +47,8 @@ data class RegisterResponse(
 
 @Serializable
 data class UserProfile(
-    val id: Int,
-    val email: String,
+    val id: Int? = null,
+    val email: String? = null,
     val full_name: String? = null,
     val major: String? = null,
     val experience: String? = null,
@@ -72,7 +75,10 @@ interface ApiService {
     suspend fun getUserProfile(@Path("user_id") userId: Int): UserProfile
 
     @POST("/api/v1/profiles")
-    suspend fun updateProfile(@Body request: ProfileUpdateRequest): UserProfile
+    suspend fun createProfile(@Body request: ProfileUpdateRequest): UserProfile
+
+    @PUT("/api/v1/profiles/{user_id}")
+    suspend fun updateProfile(@Path("user_id") userId: Int, @Body request: ProfileUpdateRequest): UserProfile
 }
 
 object RetrofitClient {
@@ -84,6 +90,13 @@ object RetrofitClient {
 
     private val client = OkHttpClient.Builder()
         .addInterceptor(logging)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+            TokenHolder.token?.let {
+                request.addHeader("Authorization", "Bearer $it")
+            }
+            chain.proceed(request.build())
+        }
         .build()
 
     val apiService: ApiService by lazy {

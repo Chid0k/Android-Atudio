@@ -107,9 +107,8 @@ fun UpdateProfileScreen(
                         isLoading = true
                         errorMessage = null
                         try {
-                            RetrofitClient.apiService.updateProfile(
-                                ProfileUpdateRequest(userId, fullName, major, experience, skills)
-                            )
+                            val request = ProfileUpdateRequest(userId, fullName, major, experience, skills)
+                            RetrofitClient.apiService.updateProfile(userId, request)
                             onUpdateSuccess()
                         } catch (e: Exception) {
                             errorMessage = "Cập nhật thất bại: ${e.localizedMessage}"

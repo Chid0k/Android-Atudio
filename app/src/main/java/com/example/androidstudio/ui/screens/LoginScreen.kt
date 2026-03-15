@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     onLoginSuccess: (Int) -> Unit,
+    onNavigateToCreateProfile: (Int) -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit
 ) {
@@ -112,10 +113,24 @@ fun LoginScreen(
                             isLoading = true
                             errorMessage = null
                             try {
-                                val response = RetrofitClient.apiService.login(
+                                val loginResponse = RetrofitClient.apiService.login(
                                     LoginRequest(email, password)
                                 )
-                                onLoginSuccess(response.user_id)
+                                val userId = loginResponse.user_id
+                                
+                                // Check if profile exists
+                                try {
+                                    val profile = RetrofitClient.apiService.getUserProfile(userId)
+                                    if (profile.full_name.isNullOrBlank()) {
+                                        onNavigateToCreateProfile(userId)
+                                    } else {
+                                        onLoginSuccess(userId)
+                                    }
+                                } catch (e: Exception) {
+                                    // If profile doesn't exist (e.g., 404), go to create profile
+                                    onNavigateToCreateProfile(userId)
+                                }
+
                             } catch (e: Exception) {
                                 errorMessage = "Đăng nhập thất bại: ${e.localizedMessage}"
                             } finally {
@@ -166,16 +181,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                Row {
-                    Text("Chưa có tài khoản? ", color = Color.Gray)
-                    TextButton(onClick = onNavigateToRegister, contentPadding = PaddingValues(0.dp)) {
-                        Text(
-                            "đăng ký ngay",
-                            color = Color(0xFF0E3C3E),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             }
         }
     }
