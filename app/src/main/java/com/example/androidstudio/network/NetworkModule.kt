@@ -11,6 +11,7 @@ import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.http.*
+import java.util.concurrent.TimeUnit
 
 @Serializable
 data class CVResponse(
@@ -154,6 +155,9 @@ object RetrofitClient {
     }
 
     private val client = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .addInterceptor(logging)
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
