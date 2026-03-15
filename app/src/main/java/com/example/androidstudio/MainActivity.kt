@@ -142,11 +142,18 @@ fun MainApp() {
                 onNavigateToHistory = { navController.navigate("history") },
                 onNavigateToKnowledge = { navController.navigate("knowledge") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
-                onNavigateToEdit = { navController.navigate("edit_profile") }
+                onNavigateToEdit = { navController.navigate("edit_profile") },
+                onLogout = {
+                    loggedInUserId = null
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
             )
         }
         composable("edit_profile") {
             EditProfileScreen(
+                userId = loggedInUserId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -77,7 +77,7 @@ interface ApiService {
     @POST("/api/v1/profiles")
     suspend fun createProfile(@Body request: ProfileUpdateRequest): UserProfile
 
-    @PUT("/api/v1/profiles/{user_id}")
+    @PATCH("/api/v1/profiles/{user_id}")
     suspend fun updateProfile(@Path("user_id") userId: Int, @Body request: ProfileUpdateRequest): UserProfile
 }
 

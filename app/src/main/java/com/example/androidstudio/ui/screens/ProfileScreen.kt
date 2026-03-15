@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidstudio.network.RetrofitClient
+import com.example.androidstudio.network.TokenHolder
 import com.example.androidstudio.network.UserProfile
 import com.example.androidstudio.ui.components.BottomNavigationBar
 import kotlinx.coroutines.launch
@@ -34,10 +35,12 @@ fun ProfileScreen(
     onNavigateToHistory: () -> Unit,
     onNavigateToKnowledge: () -> Unit,
     onNavigateToInterviewSetup: () -> Unit,
-    onNavigateToEdit: () -> Unit
+    onNavigateToEdit: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val primaryColor = Color(0xFF0D3B34)
-    val backgroundColor = Color(0xFFF8FAF9)
+    val accentColor = Color(0xFFCCFF90)
+    val backgroundColor = Color(0xFFF0F4F3)
     
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -73,7 +76,7 @@ fun ProfileScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onNavigateToInterviewSetup,
-                containerColor = Color(0xFFCCFF90),
+                containerColor = accentColor,
                 contentColor = Color.Black,
                 shape = CircleShape,
                 modifier = Modifier.offset(y = 50.dp)
@@ -89,7 +92,27 @@ fun ProfileScreen(
             }
         } else if (errorMessage != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = {
+                        if (userId != null) {
+                            scope.launch {
+                                isLoading = true
+                                errorMessage = null
+                                try {
+                                    userProfile = RetrofitClient.apiService.getUserProfile(userId)
+                                } catch (e: Exception) {
+                                    errorMessage = "Không thể tải hồ sơ: ${e.localizedMessage}"
+                                } finally {
+                                    isLoading = false
+                                }
+                            }
+                        }
+                    }) {
+                        Text("Thử lại")
+                    }
+                }
             }
         } else {
             Column(
@@ -99,43 +122,51 @@ fun ProfileScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Header Section with Gradient Background
+                // Header Section
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(primaryColor, Color(0xFF1B5E20))
-                            )
-                        )
+                        .padding(bottom = 24.dp)
                 ) {
+                    // Gradient Background
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(primaryColor, Color(0xFF1B5E20))
+                                )
+                            )
+                    )
+
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                            .fillMaxWidth()
+                            .padding(top = 80.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Profile Picture with Ring
-                        Box(
+                        // Profile Image with Border
+                        Surface(
                             modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .padding(4.dp)
+                                .size(110.dp)
+                                .clip(CircleShape),
+                            color = Color.White,
+                            shadowElevation = 8.dp
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .padding(4.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White),
+                                    .background(Color(0xFFE8F5E9)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Rounded.Person,
                                     contentDescription = null,
-                                    modifier = Modifier.size(60.dp),
+                                    modifier = Modifier.size(70.dp),
                                     tint = primaryColor
                                 )
                             }
@@ -145,118 +176,147 @@ fun ProfileScreen(
 
                         Text(
                             text = userProfile?.full_name ?: "Người dùng",
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF2C3E50)
                         )
-                        Text(
-                            text = "Pen tester • 1 năm kinh nghiệm",
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 14.sp
-                        )
+                        
+                        Surface(
+                            modifier = Modifier.padding(top = 4.dp),
+                            color = accentColor.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(
+                                text = userProfile?.major ?: "Chưa cập nhật",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = primaryColor
+                            )
+                        }
                     }
 
-                    // Edit Button
+                    // Edit Button in Corner
                     IconButton(
                         onClick = onNavigateToEdit,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            .background(Color.White.copy(alpha = 0.3f), CircleShape)
                     ) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.White)
+                        Icon(Icons.Rounded.Settings, contentDescription = "Edit", tint = Color.White)
                     }
                 }
 
-                // Profile Content
+                // Stats/Quick Info Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    QuickStatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.History,
+                        label = "Kinh nghiệm",
+                        value = userProfile?.experience?.split(" ")?.firstOrNull() ?: "0",
+                        unit = "năm"
+                    )
+                    QuickStatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Star,
+                        label = "Kỹ năng",
+                        value = userProfile?.skills?.split(",")?.size?.toString() ?: "0",
+                        unit = "mục"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Detailed Info Section
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
+                        .padding(horizontal = 20.dp)
                 ) {
                     Text(
-                        "Thông tin cá nhân",
+                        "Thông tin chi tiết",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         color = primaryColor,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
                     )
 
-                    // Info Cards
-                    ProfileInfoCard(
-                        label = "Email",
-                        value = userProfile?.email ?: "...",
-                        icon = Icons.Rounded.Email,
-                        color = Color(0xFFE3F2FD)
+                    InfoRow(
+                        icon = Icons.Rounded.Business,
+                        label = "Chuyên ngành",
+                        value = userProfile?.major ?: "Chưa cập nhật"
                     )
-                    ProfileInfoCard(
-                        label = "Ngành nghề",
-                        value = "An toàn thông tin",
-                        icon = Icons.Rounded.Work,
-                        color = Color(0xFFFFF3E0)
-                    )
-                    ProfileInfoCard(
-                        label = "Trình độ",
-                        value = "Đại học - Cử nhân",
-                        icon = Icons.Rounded.School,
-                        color = Color(0xFFF1F8E9)
+                    
+                    InfoRow(
+                        icon = Icons.Rounded.Extension,
+                        label = "Kỹ năng tiêu biểu",
+                        value = userProfile?.skills ?: "Chưa cập nhật"
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
-                        "Tài liệu",
+                        "Hồ sơ năng lực",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         color = primaryColor,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
                     )
 
-                    // CV Section
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { /* Download CV */ },
+                    // Documents/CV Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier
+                                .clickable { /* Action */ }
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(44.dp)
                                     .background(Color(0xFFFFEBEE), RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, tint = Color(0xFFC62828))
+                                Icon(Icons.Rounded.Description, contentDescription = null, tint = Color(0xFFC62828))
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("CV mặc định", fontSize = 12.sp, color = Color.Gray)
-                                Text("CV_DoDucChinh.pdf", fontWeight = FontWeight.Bold)
+                                Text("CV của bạn", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("Tải lên để AI phân tích tốt hơn", fontSize = 12.sp, color = Color.Gray)
                             }
-                            Icon(Icons.Rounded.Download, contentDescription = null, tint = Color.Gray)
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.LightGray)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Logout Button
-                    Button(
-                        onClick = { /* Logout */ },
+                    // Logout Button with subtle design
+                    OutlinedButton(
+                        onClick = {
+                            TokenHolder.token = null
+                            onLogout()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE), contentColor = Color(0xFFC62828)),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = null
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC62828)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFCDD2)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Icon(Icons.Rounded.Logout, contentDescription = null)
+                        Icon(Icons.Rounded.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Đăng xuất", fontWeight = FontWeight.Bold)
+                        Text("Đăng xuất tài khoản", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(100.dp))
@@ -267,32 +327,50 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileInfoCard(label: String, value: String, icon: ImageVector, color: Color) {
-    Surface(
+fun QuickStatCard(modifier: Modifier = Modifier, icon: ImageVector, label: String, value: String, unit: String) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, contentDescription = null, tint = Color(0xFF0D3B34).copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2C3E50))
+                Text(text = " $unit", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 2.dp))
+            }
+            Text(text = label, fontSize = 11.sp, color = Color.Gray)
+        }
+    }
+}
+
+@Composable
+fun InfoRow(icon: ImageVector, label: String, value: String) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = Color.White,
-        shadowElevation = 1.dp
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = Color.White,
+            shadowElevation = 1.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(color, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(20.dp))
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = Color(0xFF0D3B34), modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(label, fontSize = 12.sp, color = Color.Gray)
-                Text(value, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column {
+            Text(label, fontSize = 11.sp, color = Color.Gray)
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2C3E50))
         }
     }
 }
