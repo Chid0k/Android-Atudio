@@ -55,6 +55,10 @@ object TokenHolder {
     var token: String? = null
 }
 
+object SessionManager {
+    var sessionId: Int? = null
+}
+
 @Serializable
 data class LoginRequest(
     val email: String,
@@ -71,16 +75,18 @@ data class LoginResponse(
 @Serializable
 data class RegisterRequest(
     val email: String,
-    val password: String
+    val password: String,
+    @SerialName("display_name") val displayName: String
 )
 
 @Serializable
 data class RegisterResponse(
-    val id: Int,
-    val email: String,
-    val password_hash: String? = null,
-    val google_id: String? = null,
-    val created_at: String? = null
+    val id: Int? = null,
+    @SerialName("user_id") val userId: Int? = null,
+    val email: String? = null,
+    @SerialName("password_hash") val passwordHash: String? = null,
+    @SerialName("google_id") val googleId: String? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
@@ -109,6 +115,57 @@ data class UploadCVResponse(
     val filename: String? = null,
     val file_url: String? = null,
     val cv_path: String? = null
+)
+
+@Serializable
+data class InterviewSessionRequest(
+    @SerialName("user_id") val userId: Int,
+    val title: String,
+    @SerialName("interview_type") val interviewType: String,
+    val difficulty: String,
+    val mode: String,
+    @SerialName("duration_minutes") val durationMinutes: Int,
+    @SerialName("actual_duration") val actualDuration: Int? = 0,
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    val score: Int? = 0,
+    val status: String = "completed",
+    @SerialName("config_json") val configJson: String? = null,
+    @SerialName("ai_questions_json") val aiQuestionsJson: String? = null,
+    @SerialName("feedback_json") val feedbackJson: String? = null,
+    @SerialName("is_favorite") val isFavorite: Int? = 0
+)
+
+@Serializable
+data class InterviewSessionResponse(
+    @SerialName("session_id") val sessionId: Int,
+    @SerialName("user_id") val userId: Int,
+    val title: String,
+    @SerialName("interview_type") val interviewType: String,
+    val difficulty: String,
+    val mode: String,
+    @SerialName("duration_minutes") val durationMinutes: Int,
+    @SerialName("actual_duration") val actualDuration: Int? = null,
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    val score: Int? = null,
+    val status: String,
+    @SerialName("config_json") val configJson: String? = null,
+    @SerialName("ai_questions_json") val aiQuestionsJson: String? = null,
+    @SerialName("feedback_json") val feedbackJson: String? = null,
+    @SerialName("is_favorite") val isFavorite: Int? = null
+)
+
+@Serializable
+data class InterviewSessionUpdateRequest(
+    @SerialName("actual_duration") val actualDuration: Int? = null,
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    val score: Int? = null,
+    val status: String? = null,
+    @SerialName("config_json") val configJson: String? = null,
+    @SerialName("feedback_json") val feedbackJson: String? = null,
+    @SerialName("is_favorite") val isFavorite: Int? = null
 )
 
 interface ApiService {
@@ -145,10 +202,29 @@ interface ApiService {
         @Path("user_id") userId: Int,
         @Path("article_index") articleIndex: Int
     ): ArticleDetailResponse
+
+    @POST("/api/v1/interview-sessions")
+    suspend fun createInterviewSession(@Body request: InterviewSessionRequest): InterviewSessionResponse
+
+    @PATCH("/api/v1/interview-sessions/{session_id}")
+    suspend fun updateInterviewSession(
+        @Path("session_id") sessionId: Int,
+        @Body request: InterviewSessionUpdateRequest
+    ): InterviewSessionResponse
+
+    @GET("/api/v1/text/{user_id}/{session_id}/{text}")
+    suspend fun sendSTTText(
+        @Path("user_id") userId: Int,
+        @Path("session_id") sessionId: Int,
+        @Path("text") text: String
+    ): ResponseBody
 }
 
 object RetrofitClient {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        coerceInputValues = true
+    }
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

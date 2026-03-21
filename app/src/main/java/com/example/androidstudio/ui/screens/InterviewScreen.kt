@@ -1,5 +1,9 @@
 package com.example.androidstudio.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -7,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,19 +19,50 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.example.androidstudio.interview.InterviewModule
+import com.example.androidstudio.network.InterviewSessionUpdateRequest
+import com.example.androidstudio.network.RetrofitClient
+import com.example.androidstudio.network.SessionManager
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun InterviewScreen(
+    userId: Int?,
     onEndInterview: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val interviewModule = remember(userId) { InterviewModule(context, userId) }
+    val sttText by interviewModule.sttText.collectAsState()
+    val isListening by interviewModule.isListening.collectAsState()
+    
+    var isEnding by remember { mutableStateOf(false) }
+    val startTime = remember { Date() }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            interviewModule.startListening()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            interviewModule.destroy()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // Placeholder for Interviewer Video
         Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray)) {
-            // In a real app, this would be a VideoPlayer or CameraPreview
             Text("Interviewer Video", color = Color.White, modifier = Modifier.align(Alignment.Center))
         }
 
@@ -44,7 +80,7 @@ fun InterviewScreen(
             Text("REC 00:04:11", color = Color.White, fontSize = 12.sp)
         }
 
-        // Interviewer Question Card
+        // Interviewer Question Card (Realtime streaming text)
         Card(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -56,7 +92,7 @@ fun InterviewScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Harriet M.", fontWeight = FontWeight.Bold, color = Color.Black)
                 Text(
-                    "Bạn hãy mô tả quá trình thiết kế UX mà bạn thường áp dụng cho một dự án mới?",
+                    text = if (sttText.isEmpty()) "Waiting for response..." else sttText,
                     fontSize = 14.sp,
                     color = Color.Black,
                     modifier = Modifier.padding(top = 4.dp)
@@ -86,22 +122,73 @@ fun InterviewScreen(
         ) {
             // Mic toggle
             IconButton(
-                onClick = {},
+                onClick = {
+                    if (isListening) {
+                        interviewModule.stopListening()
+                    } else {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                            interviewModule.startListening()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                },
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color.White.copy(alpha = 0.3f), CircleShape)
+                    .background(if (isListening) Color.Red else Color.White.copy(alpha = 0.3f), CircleShape)
             ) {
-                Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White)
+                Icon(
+                    imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = Color.White
+                )
             }
 
             // End call
             IconButton(
-                onClick = onEndInterview,
+                onClick = {
+                    val sessionId = SessionManager.sessionId
+                    if (sessionId != null) {
+                        scope.launch {
+                            isEnding = true
+                            try {
+                                val endTime = Date()
+                                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                                val actualDuration = ((endTime.time - startTime.time) / 60000).toInt()
+                                
+                                RetrofitClient.apiService.updateInterviewSession(
+                                    sessionId = sessionId,
+                                    request = InterviewSessionUpdateRequest(
+                                        actualDuration = actualDuration,
+                                        startTime = sdf.format(startTime),
+                                        endTime = sdf.format(endTime),
+                                        score = 85,
+                                        status = "completed",
+                                        feedbackJson = "Phỏng vấn tốt, kỹ năng giao tiếp ổn định.",
+                                        isFavorite = 1
+                                    )
+                                )
+                                onEndInterview()
+                            } catch (e: Exception) {
+                                onEndInterview()
+                            } finally {
+                                isEnding = false
+                            }
+                        }
+                    } else {
+                        onEndInterview()
+                    }
+                },
+                enabled = !isEnding,
                 modifier = Modifier
                     .size(64.dp)
-                    .background(Color.Red, CircleShape)
+                    .background(if (isEnding) Color.Gray else Color.Red, CircleShape)
             ) {
-                Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                if (isEnding) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                }
             }
 
             // Camera toggle

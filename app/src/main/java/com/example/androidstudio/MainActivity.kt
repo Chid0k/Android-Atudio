@@ -118,12 +118,14 @@ fun MainApp() {
         }
         composable("interview_setup") {
             InterviewSetupScreen(
+                userId = loggedInUserId,
                 onNavigateBack = { navController.popBackStack() },
                 onStartInterview = { navController.navigate("interview") }
             )
         }
         composable("interview") {
             InterviewScreen(
+                userId = loggedInUserId,
                 onEndInterview = { navController.navigate("result") }
             )
         }

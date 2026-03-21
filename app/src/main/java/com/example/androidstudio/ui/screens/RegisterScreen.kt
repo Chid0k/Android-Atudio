@@ -27,6 +27,7 @@ fun RegisterScreen(
     onNavigateToLogin: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -65,6 +66,16 @@ fun RegisterScreen(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = displayName,
+                onValueChange = { displayName = it },
+                label = { Text("Tên hiển thị") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = email,
@@ -119,10 +130,18 @@ fun RegisterScreen(
                         isLoading = true
                         errorMessage = null
                         try {
-                            RetrofitClient.apiService.register(
-                                RegisterRequest(email, password)
+                            val response = RetrofitClient.apiService.register(
+                                RegisterRequest(
+                                    email = email,
+                                    password = password,
+                                    displayName = displayName
+                                )
                             )
-                            onRegisterSuccess()
+                            if (response.userId != null || response.id != null) {
+                                onRegisterSuccess()
+                            } else {
+                                errorMessage = "Đăng ký thất bại: Phản hồi không hợp lệ"
+                            }
                         } catch (e: Exception) {
                             errorMessage = "Đăng ký thất bại: ${e.localizedMessage}"
                         } finally {
@@ -131,7 +150,7 @@ fun RegisterScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
+                enabled = !isLoading && email.isNotBlank() && password.isNotBlank() && displayName.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E3C3E)),
                 shape = RoundedCornerShape(8.dp)
             ) {

@@ -56,7 +56,7 @@ fun ArticleDetailScreen(
     }
 
     Scaffold(
-        containerColor = backgroundColor,
+        containerColor = Color.White,
         topBar = {
             TopAppBar(
                 title = { 
@@ -107,68 +107,67 @@ fun ArticleDetailScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Content Card
-                Surface(
+                // Header Content (Title & Category)
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp)
+                    Surface(
+                        color = primaryColor.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Surface(
-                            color = primaryColor.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = article?.category?.uppercase() ?: "HƯỚNG DẪN",
-                                color = primaryColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
                         Text(
-                            text = article?.title ?: "",
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = article?.category?.uppercase() ?: "HƯỚNG DẪN",
                             color = primaryColor,
-                            lineHeight = 34.sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Text(
-                            text = article?.description ?: "",
-                            fontSize = 15.sp,
-                            color = Color.Gray,
-                            lineHeight = 22.sp
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 24.dp),
-                            thickness = 1.dp,
-                            color = Color(0xFFF0F0F0)
-                        )
-                        
-                        Text(
-                            text = article?.content ?: "",
-                            fontSize = 16.sp,
-                            lineHeight = 28.sp,
-                            color = Color(0xFF2D312E)
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = article?.title ?: "",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = primaryColor,
+                        lineHeight = 36.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = article?.description ?: "",
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
-                
-                Spacer(modifier = Modifier.height(24.dp))
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    thickness = 1.dp,
+                    color = Color(0xFFF0F0F0)
+                )
+
+                // Main Body Content
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    Text(
+                        text = article?.content?.replace("\\n", "\n") ?: "",
+                        fontSize = 16.sp,
+                        lineHeight = 28.sp,
+                        color = Color(0xFF2D312E)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(40.dp))
+                }
             }
         }
     }

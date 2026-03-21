@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidstudio.network.KnowledgeArticle
@@ -181,7 +182,20 @@ fun KnowledgeScreen(
 
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = primaryColor)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        CircularProgressIndicator(color = primaryColor)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Vui lòng chờ, chúng tôi đang cập nhật các bài viết phù hợp cho bạn",
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             } else if (showUploadCVPrompt) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -205,7 +219,7 @@ fun KnowledgeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Hãy tải CV để chúng tôi gợi ý các bài viết phù hợp nhất cho bạn.",
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            textAlign = TextAlign.Center,
                             color = Color.Gray
                         )
                         Spacer(modifier = Modifier.height(24.dp))
@@ -271,14 +285,13 @@ fun ModernTabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifi
 
 @Composable
 fun KnowledgeContent(articles: List<KnowledgeArticle>, searchQuery: String, onNavigateToArticle: (Int) -> Unit) {
-    val filteredArticlesWithIndices = if (searchQuery.isEmpty()) {
-        articles.mapIndexed { index, article -> index to article }
-    } else {
-        articles.mapIndexed { index, article -> index to article }.filter { (_, article) ->
+    val filteredArticlesWithIndices = articles.mapIndexed { index, article -> index to article }
+
+        .filter { (_, article) ->
+            searchQuery.isEmpty() || 
             article.title.contains(searchQuery, ignoreCase = true) || 
             article.description.contains(searchQuery, ignoreCase = true) 
         }
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -292,7 +305,7 @@ fun KnowledgeContent(articles: List<KnowledgeArticle>, searchQuery: String, onNa
                     title = firstArticle.title,
                     desc = firstArticle.description,
                     icon = Icons.Rounded.AutoAwesome,
-                    onClick = { onNavigateToArticle(firstIndex) }
+                    onClick = { onNavigateToArticle(firstIndex+1) }
                 )
             }
             
@@ -307,7 +320,7 @@ fun KnowledgeContent(articles: List<KnowledgeArticle>, searchQuery: String, onNa
             }
 
             itemsIndexed(filteredArticlesWithIndices.drop(1)) { _, (index, article) ->
-                EnhancedKnowledgeItem(article, onClick = { onNavigateToArticle(index) })
+                EnhancedKnowledgeItem(article, onClick = { onNavigateToArticle(index + 1) })
             }
         } else {
             item {
