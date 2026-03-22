@@ -22,8 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidstudio.network.RetrofitClient
 import com.example.androidstudio.network.UserProfile
+import com.example.androidstudio.network.SessionHistoryManager
+import com.example.androidstudio.network.InterviewSessionResponse
 import com.example.androidstudio.ui.components.BottomNavigationBar
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.Duration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,9 +37,11 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToInterviewSetup: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToKnowledge: () -> Unit
+    onNavigateToKnowledge: () -> Unit,
+    onNavigateToResult: (Int) -> Unit
 ) {
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var sessions by remember { mutableStateOf(SessionHistoryManager.sessions) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(userId) {
@@ -42,12 +49,38 @@ fun HomeScreen(
             scope.launch {
                 try {
                     userProfile = RetrofitClient.apiService.getUserProfile(userId)
+                    val fetchedSessions = RetrofitClient.apiService.getInterviewSessions(userId)
+                    SessionHistoryManager.sessions = fetchedSessions
+                    sessions = fetchedSessions
                 } catch (e: Exception) {
                     // Silent fail or handle error if needed
                 }
             }
         }
     }
+
+    // Calculate statistics
+    val totalSessions = sessions.size
+    val totalDurationMinutes = sessions.sumOf { session ->
+        if (session.startTime != null && session.endTime != null) {
+            try {
+                val formatter = DateTimeFormatter.ISO_DATE_TIME
+                val start = LocalDateTime.parse(session.startTime, formatter)
+                val end = LocalDateTime.parse(session.endTime, formatter)
+                Duration.between(start, end).toMinutes().toInt()
+            } catch (e: Exception) {
+                0
+            }
+        } else {
+            0
+        }
+    }
+
+    val hours = totalDurationMinutes / 60
+    val minutes = totalDurationMinutes % 60
+    val durationText = if (hours > 0) "${hours}h ${minutes}p" else "${minutes}p"
+
+    val recentSessions = sessions.take(2)
 
     Scaffold(
         bottomBar = { 
@@ -81,15 +114,18 @@ fun HomeScreen(
             item {
                 HomeHeader(userProfile, onNavigateToProfile)
                 Spacer(modifier = Modifier.height(24.dp))
-                StatCards()
+                StatCards(durationText, totalSessions.toString())
                 Spacer(modifier = Modifier.height(24.dp))
                 StartInterviewBanner(onNavigateToInterviewSetup)
                 Spacer(modifier = Modifier.height(24.dp))
                 SectionHeader(title = "Gần đây", onSeeAllClick = onNavigateToHistory)
             }
             
-            items(recentInterviews) { interview ->
-                InterviewHistoryItem(interview)
+            items(recentSessions) { session ->
+                InterviewHistoryItem(
+                    session = session,
+                    onClick = { onNavigateToResult(session.sessionId) }
+                )
             }
         }
     }
@@ -136,19 +172,19 @@ fun HomeHeader(userProfile: UserProfile?, onProfileClick: () -> Unit) {
 }
 
 @Composable
-fun StatCards() {
+fun StatCards(duration: String, sessionsCount: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         StatCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Timer,
             label = "Đã luyện",
-            value = "12h 30p"
+            value = duration
         )
         StatCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Assignment,
             label = "Buổi tập",
-            value = "24"
+            value = sessionsCount
         )
     }
 }
@@ -228,22 +264,23 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
 }
 
 @Composable
-fun InterviewHistoryItem(interview: InterviewHistory) {
+fun InterviewHistoryItem(session: InterviewSessionResponse, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
             modifier = Modifier.size(48.dp),
             shape = RoundedCornerShape(12.dp),
-            color = interview.color.copy(alpha = 0.1f)
+            color = Color.Blue.copy(alpha = 0.1f)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = interview.title.take(1),
-                    color = interview.color,
+                    text = session.title.take(1),
+                    color = Color.Blue,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -252,17 +289,17 @@ fun InterviewHistoryItem(interview: InterviewHistory) {
         Spacer(modifier = Modifier.width(16.dp))
         
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = interview.title, fontWeight = FontWeight.Medium)
-            Text(text = interview.date, color = Color.Gray, fontSize = 12.sp)
+            Text(text = session.title, fontWeight = FontWeight.Medium)
+            val dateText = try {
+                val formatter = DateTimeFormatter.ISO_DATE_TIME
+                val ldt = LocalDateTime.parse(session.startTime ?: "", formatter)
+                ldt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+            } catch (e: Exception) {
+                session.startTime ?: "N/A"
+            }
+            Text(text = dateText, color = Color.Gray, fontSize = 12.sp)
         }
         
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
     }
 }
-
-data class InterviewHistory(val title: String, val date: String, val color: Color)
-
-val recentInterviews = listOf(
-    InterviewHistory("Product Manager", "Vừa xong • 45 phút • 8.5/10", Color.Blue),
-    InterviewHistory("Frontend Dev", "2 ngày trước • 30 phút • 7.0/10", Color.Magenta)
-)

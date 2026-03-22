@@ -4,14 +4,17 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,38 +28,76 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.androidstudio.interview.InterviewModule
-import com.example.androidstudio.network.InterviewSessionUpdateRequest
-import com.example.androidstudio.network.RetrofitClient
-import com.example.androidstudio.network.SessionManager
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
 @Composable
 fun InterviewScreen(
     userId: Int?,
+    sessionId: Int?,
     onEndInterview: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val interviewModule = remember(userId) { InterviewModule(context, userId) }
-    val sttText by interviewModule.sttText.collectAsState()
-    val isListening by interviewModule.isListening.collectAsState()
-    
-    var isEnding by remember { mutableStateOf(false) }
-    val startTime = remember { Date() }
+    var interviewerQuestion by remember { mutableStateOf("Đang kết nối tới người phỏng vấn...") }
+    var interviewerHint by remember { mutableStateOf("") }
+    var userSpeechText by remember { mutableStateOf("") }
+    var isListening by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    var isQuestionVisible by remember { mutableStateOf(true) }
+    var isHintVisible by remember { mutableStateOf(true) }
+
+    val interviewModule = remember {
+        if (userId != null && sessionId != null) {
+            InterviewModule(
+                context = context,
+                userId = userId,
+                sessionId = sessionId,
+                onResponseReceived = { question, hint ->
+                    interviewerQuestion = question
+                    interviewerHint = hint
+                    isListening = false
+                },
+                onUserSpeechRecognized = { speech ->
+                    userSpeechText = speech
+                },
+                onListeningStateChanged = { listening ->
+                    isListening = listening
+                },
+                onError = { error ->
+                    errorMessage = error
+                    isListening = false
+                }
+            )
+        } else {
+            null
+        }
+    }
+
+    // Camera/Mic permissions
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            interviewModule.startListening()
+        hasAudioPermission = isGranted
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasAudioPermission) {
+            launcher.launch(Manifest.permission.RECORD_AUDIO)
         }
+        interviewModule?.connect()
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            interviewModule.destroy()
+            interviewModule?.disconnect()
         }
     }
 
@@ -67,52 +108,144 @@ fun InterviewScreen(
         }
 
         // Recording Indicator
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .background(Color.Red.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("REC 00:04:11", color = Color.White, fontSize = 12.sp)
+        if (isListening) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Green.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Đang nghe...", color = Color.White, fontSize = 12.sp)
+            }
         }
 
-        // Interviewer Question Card (Realtime streaming text)
-        Card(
+        // Top Info Area (Questions & Hints)
+        Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(16.dp)
                 .width(280.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f)),
-            shape = RoundedCornerShape(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Harriet M.", fontWeight = FontWeight.Bold, color = Color.Black)
-                Text(
-                    text = if (sttText.isEmpty()) "Waiting for response..." else sttText,
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+            // Interviewer Question Card
+            AnimatedVisibility(visible = isQuestionVisible) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Người phỏng vấn AI", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text(
+                            interviewerQuestion,
+                            fontSize = 14.sp,
+                            color = Color.Black,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        if (errorMessage != null) {
+                            Text(
+                                errorMessage!!,
+                                color = Color.Red,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Hint Card
+            AnimatedVisibility(visible = isHintVisible && interviewerHint.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.Yellow.copy(alpha = 0.8f)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Gợi ý", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                            Text(
+                                interviewerHint,
+                                fontSize = 13.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // User PIP (Picture-in-Picture)
+        // Sidebar Toggles (Question & Hint)
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Toggle Question
+            IconButton(
+                onClick = { isQuestionVisible = !isQuestionVisible },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        if (isQuestionVisible) Color.Blue.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+            ) {
+                Icon(Icons.Default.Help, contentDescription = "Ẩn/Hiện câu hỏi", tint = Color.White)
+            }
+
+            // Toggle Hint
+            IconButton(
+                onClick = { isHintVisible = !isHintVisible },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        if (isHintVisible) Color.Yellow.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+            ) {
+                Icon(Icons.Default.Lightbulb, contentDescription = "Ẩn/Hiện gợi ý", tint = Color.White)
+            }
+        }
+
+        // User PIP (Picture-in-Picture) with Speech Text
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 100.dp)
-                .size(100.dp, 140.dp)
+                .size(150.dp, 200.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.Gray)
+                .background(Color.Gray.copy(alpha = 0.6f))
         ) {
-            Text("User", color = Color.White, modifier = Modifier.align(Alignment.Center))
+            Column(
+                modifier = Modifier.fillMaxSize().padding(8.dp),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                if (userSpeechText.isNotEmpty()) {
+                    Text(
+                        userSpeechText,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Bạn", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
+            }
         }
 
-        // Controls
+        // Bottom Controls
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -123,22 +256,26 @@ fun InterviewScreen(
             // Mic toggle
             IconButton(
                 onClick = {
-                    if (isListening) {
-                        interviewModule.stopListening()
-                    } else {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                            interviewModule.startListening()
+                    if (hasAudioPermission) {
+                        if (isListening) {
+                            interviewModule?.stopListening()
                         } else {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            userSpeechText = "" // Reset text khi bắt đầu nghe mới
+                            interviewModule?.startListening()
                         }
+                    } else {
+                        launcher.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 },
                 modifier = Modifier
                     .size(48.dp)
-                    .background(if (isListening) Color.Red else Color.White.copy(alpha = 0.3f), CircleShape)
+                    .background(
+                        if (isListening) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.3f),
+                        CircleShape
+                    )
             ) {
                 Icon(
-                    imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
+                    if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
                     contentDescription = null,
                     tint = Color.White
                 )
@@ -147,51 +284,17 @@ fun InterviewScreen(
             // End call
             IconButton(
                 onClick = {
-                    val sessionId = SessionManager.sessionId
-                    if (sessionId != null) {
-                        scope.launch {
-                            isEnding = true
-                            try {
-                                val endTime = Date()
-                                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                                val actualDuration = ((endTime.time - startTime.time) / 60000).toInt()
-                                
-                                RetrofitClient.apiService.updateInterviewSession(
-                                    sessionId = sessionId,
-                                    request = InterviewSessionUpdateRequest(
-                                        actualDuration = actualDuration,
-                                        startTime = sdf.format(startTime),
-                                        endTime = sdf.format(endTime),
-                                        score = 85,
-                                        status = "completed",
-                                        feedbackJson = "Phỏng vấn tốt, kỹ năng giao tiếp ổn định.",
-                                        isFavorite = 1
-                                    )
-                                )
-                                onEndInterview()
-                            } catch (e: Exception) {
-                                onEndInterview()
-                            } finally {
-                                isEnding = false
-                            }
-                        }
-                    } else {
-                        onEndInterview()
-                    }
+                    interviewModule?.disconnect()
+                    onEndInterview()
                 },
-                enabled = !isEnding,
                 modifier = Modifier
                     .size(64.dp)
-                    .background(if (isEnding) Color.Gray else Color.Red, CircleShape)
+                    .background(Color.Red, CircleShape)
             ) {
-                if (isEnding) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
-                }
+                Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
             }
 
-            // Camera toggle
+            // Camera toggle (Mock)
             IconButton(
                 onClick = {},
                 modifier = Modifier

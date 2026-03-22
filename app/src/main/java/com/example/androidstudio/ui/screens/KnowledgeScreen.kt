@@ -1,7 +1,5 @@
 package com.example.androidstudio.ui.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.example.androidstudio.network.KnowledgeArticle
 import com.example.androidstudio.network.RetrofitClient
 import com.example.androidstudio.ui.components.BottomNavigationBar
+import com.example.androidstudio.ui.components.ModernTabItem
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
@@ -249,36 +248,6 @@ fun KnowledgeScreen(
                     ClothingContent()
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ModernTabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val containerColor by animateColorAsState(
-        if (isSelected) Color.White else Color.Transparent,
-        animationSpec = tween(durationMillis = 300), label = ""
-    )
-    val contentColor by animateColorAsState(
-        if (isSelected) Color(0xFF0D3B34) else Color.Gray,
-        animationSpec = tween(durationMillis = 300), label = ""
-    )
-
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = containerColor,
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = if (isSelected) 4.dp else 0.dp
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
-            Text(
-                text = text,
-                color = contentColor,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                fontSize = 14.sp
-            )
         }
     }
 }

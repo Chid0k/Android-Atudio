@@ -1,7 +1,6 @@
 package com.example.androidstudio.ui.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,7 +23,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidstudio.network.FeedbackData
+import com.example.androidstudio.network.InterviewSessionResponse
+import com.example.androidstudio.network.RetrofitClient
+import com.example.androidstudio.network.SessionHistoryManager
 import com.example.androidstudio.ui.components.BottomNavigationBar
+import com.example.androidstudio.ui.components.ModernTabItem
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +42,15 @@ fun HistoryScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    
+    val sessions = SessionHistoryManager.sessions
+    
+    // Tính điểm trung bình dựa trên score trực tiếp từ session
+    val averageScore = remember(sessions) {
+        if (sessions.isNotEmpty()) {
+            sessions.mapNotNull { it.score?.toDouble() }.average()
+        } else 0.0
+    }
 
     val primaryColor = Color(0xFF0D3B34)
     val backgroundColor = Color(0xFFF8FAF9)
@@ -138,42 +152,60 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             if (selectedTab == 0) {
-                HistoryContent(onNavigateToResult)
+                HistoryContent(sessions, searchQuery, onNavigateToResult)
             } else {
-                StatisticsContent()
+                StatisticsContent(sessions, averageScore)
             }
         }
     }
 }
 
 @Composable
-fun HistoryContent(onNavigateToResult: (String) -> Unit) {
+fun HistoryContent(
+    sessions: List<InterviewSessionResponse>,
+    searchQuery: String,
+    onNavigateToResult: (String) -> Unit
+) {
+    val filteredSessions = sessions.filter { 
+        searchQuery.isEmpty() || it.title.contains(searchQuery, ignoreCase = true)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            FeaturedHistoryCard(
-                title = "Buổi tập gần nhất",
-                desc = "Senior UX Designer - Điểm: 8.5",
-                icon = Icons.Rounded.History,
-                onClick = { onNavigateToResult("1") }
-            )
-        }
-        
-        item {
-            Text(
-                "Tất cả lịch sử",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color(0xFF0D3B34),
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
+        if (filteredSessions.isNotEmpty()) {
+            item {
+                val latest = filteredSessions.first()
+                val scoreDisplay = String.format(Locale.US, "%.1f", latest.score?.toDouble() ?: 0.0)
+                FeaturedHistoryCard(
+                    title = "Buổi tập gần nhất",
+                    desc = "${latest.title} - Điểm: $scoreDisplay",
+                    icon = Icons.Rounded.History,
+                    onClick = { onNavigateToResult(latest.sessionId.toString()) }
+                )
+            }
+            
+            item {
+                Text(
+                    "Tất cả lịch sử",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF0D3B34),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
 
-        items(historyItems) { item ->
-            EnhancedHistoryItem(item, onClick = { onNavigateToResult(item.id) })
+            items(filteredSessions) { session ->
+                EnhancedHistoryItem(session, onClick = { onNavigateToResult(session.sessionId.toString()) })
+            }
+        } else {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    Text("Chưa có lịch sử luyện tập nào", color = Color.Gray)
+                }
+            }
         }
     }
 }
@@ -232,7 +264,9 @@ fun FeaturedHistoryCard(title: String, desc: String, icon: ImageVector, onClick:
 }
 
 @Composable
-fun EnhancedHistoryItem(item: HistoryItem, onClick: () -> Unit) {
+fun EnhancedHistoryItem(session: InterviewSessionResponse, onClick: () -> Unit) {
+    val scoreDisplay = String.format(Locale.US, "%.1f", session.score?.toDouble() ?: 0.0)
+    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -249,22 +283,31 @@ fun EnhancedHistoryItem(item: HistoryItem, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(item.iconBg.copy(alpha = 0.2f)),
+                    .background(Color(0xFFE8F5E9).copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(28.dp))
+                Icon(
+                    when(session.interviewType.lowercase()) {
+                        "technical" -> Icons.Default.Code
+                        "behavioral" -> Icons.Default.Person
+                        else -> Icons.Default.BusinessCenter
+                    }, 
+                    contentDescription = null, 
+                    tint = Color(0xFF2E7D32), 
+                    modifier = Modifier.size(28.dp)
+                )
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                Text(item.time, color = Color.Gray, fontSize = 13.sp)
+                Text(session.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
+                Text(session.startTime?.take(10) ?: "N/A", color = Color.Gray, fontSize = 13.sp)
             }
             Surface(
                 color = Color(0xFFF1F8E9),
                 shape = CircleShape
             ) {
                 Text(
-                    text = item.score,
+                    text = scoreDisplay,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -278,7 +321,7 @@ fun EnhancedHistoryItem(item: HistoryItem, onClick: () -> Unit) {
 }
 
 @Composable
-fun StatisticsContent() {
+fun StatisticsContent(sessions: List<InterviewSessionResponse>, averageScore: Double) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -300,7 +343,7 @@ fun StatisticsContent() {
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Bạn đã tiến bộ hơn 15% so với tuần trước!",
+                        "Bạn đã hoàn thành ${sessions.size} buổi luyện tập!",
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -314,15 +357,17 @@ fun StatisticsContent() {
         Spacer(modifier = Modifier.height(16.dp))
         
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatCard(Modifier.weight(1f), "Tổng thời gian", "12.5 giờ", Icons.Rounded.Schedule, Color(0xFFE3F2FD))
-            StatCard(Modifier.weight(1f), "Số buổi tập", "24 buổi", Icons.Rounded.CalendarToday, Color(0xFFFFF3E0))
+            val maxScore = sessions.maxOfOrNull { it.score?.toDouble() ?: 0.0 } ?: 0.0
+            
+            StatCard(Modifier.weight(1f), "Điểm cao nhất", String.format(Locale.US, "%.1f", maxScore), Icons.Rounded.EmojiEvents, Color(0xFFFFF9C4))
+            StatCard(Modifier.weight(1f), "Số buổi tập", "${sessions.size} buổi", Icons.Rounded.CalendarToday, Color(0xFFFFF3E0))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatCard(Modifier.weight(1f), "Điểm trung bình", "7.8", Icons.Rounded.Star, Color(0xFFF1F8E9))
-            StatCard(Modifier.weight(1f), "Kỹ năng tốt nhất", "Giao tiếp", Icons.Rounded.RecordVoiceOver, Color(0xFFF3E5F5))
+            StatCard(Modifier.weight(1f), "Điểm trung bình", String.format(Locale.US, "%.1f", averageScore), Icons.Rounded.Star, Color(0xFFF1F8E9))
+            StatCard(Modifier.weight(1f), "Trạng thái", "Đang tiến bộ", Icons.Rounded.TrendingUp, Color(0xFFE1F5FE))
         }
         
         Spacer(modifier = Modifier.height(100.dp))
@@ -355,20 +400,3 @@ fun StatCard(modifier: Modifier, title: String, value: String, icon: ImageVector
         }
     }
 }
-
-data class HistoryItem(
-    val id: String,
-    val title: String,
-    val time: String,
-    val score: String,
-    val icon: ImageVector,
-    val iconBg: Color,
-    val iconColor: Color
-)
-
-val historyItems = listOf(
-    HistoryItem("1", "Senior UX Designer", "Hôm nay, 15:30", "8.5", Icons.Default.BusinessCenter, Color(0xFFE8F5E9), Color(0xFF2E7D32)),
-    HistoryItem("2", "Product Manager", "Hôm qua, 10:00", "7.0", Icons.Default.Person, Color(0xFFE3F2FD), Color(0xFF1976D2)),
-    HistoryItem("3", "Frontend Developer", "20 Th10, 09:00", "7.5", Icons.Default.Code, Color(0xFFFFF3E0), Color(0xFFE65100)),
-    HistoryItem("4", "Data Analyst", "18 Th10, 14:00", "7.8", Icons.Default.Search, Color(0xFFFFEBEE), Color(0xFFC62828))
-)

@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.androidstudio.network.SessionManager
 import com.example.androidstudio.ui.screens.*
 import com.example.androidstudio.ui.theme.InterviewAppTheme
 
@@ -92,7 +93,8 @@ fun MainApp() {
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
                 onNavigateToHistory = { navController.navigate("history") },
-                onNavigateToKnowledge = { navController.navigate("knowledge") }
+                onNavigateToKnowledge = { navController.navigate("knowledge") },
+                onNavigateToResult = { sessionId -> navController.navigate("result/$sessionId") }
             )
         }
         composable("knowledge") {
@@ -126,11 +128,23 @@ fun MainApp() {
         composable("interview") {
             InterviewScreen(
                 userId = loggedInUserId,
-                onEndInterview = { navController.navigate("result") }
+                sessionId = SessionManager.sessionId,
+                onEndInterview = { navController.navigate("result/${SessionManager.sessionId}?isFromInterview=true") }
             )
         }
-        composable("result") {
+        composable(
+            route = "result/{sessionId}?isFromInterview={isFromInterview}",
+            arguments = listOf(
+                navArgument("sessionId") { type = NavType.IntType; defaultValue = -1 },
+                navArgument("isFromInterview") { type = NavType.BoolType; defaultValue = false }
+            )
+        ) { backStackEntry ->
+            val sessionId = backStackEntry.arguments?.getInt("sessionId")?.takeIf { it != -1 }
+            val isFromInterview = backStackEntry.arguments?.getBoolean("isFromInterview") ?: false
             ResultAnalysisScreen(
+                userId = loggedInUserId,
+                sessionId = sessionId,
+                isFromInterview = isFromInterview,
                 onNavigateBack = { navController.navigate("home") {
                     popUpTo("home") { inclusive = true }
                 } }
@@ -142,7 +156,7 @@ fun MainApp() {
                 onNavigateToKnowledge = { navController.navigate("knowledge") },
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
-                onNavigateToResult = { navController.navigate("result") }
+                onNavigateToResult = { sessionId -> navController.navigate("result/$sessionId") }
             )
         }
         composable("profile") {

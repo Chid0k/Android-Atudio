@@ -59,6 +59,10 @@ object SessionManager {
     var sessionId: Int? = null
 }
 
+object SessionHistoryManager {
+    var sessions: List<InterviewSessionResponse> = emptyList()
+}
+
 @Serializable
 data class LoginRequest(
     val email: String,
@@ -128,8 +132,8 @@ data class InterviewSessionRequest(
     @SerialName("actual_duration") val actualDuration: Int? = 0,
     @SerialName("start_time") val startTime: String? = null,
     @SerialName("end_time") val endTime: String? = null,
-    val score: Int? = 0,
-    val status: String = "completed",
+    val score: Double? = 0.0,
+    val status: String = "pending",
     @SerialName("config_json") val configJson: String? = null,
     @SerialName("ai_questions_json") val aiQuestionsJson: String? = null,
     @SerialName("feedback_json") val feedbackJson: String? = null,
@@ -148,7 +152,7 @@ data class InterviewSessionResponse(
     @SerialName("actual_duration") val actualDuration: Int? = null,
     @SerialName("start_time") val startTime: String? = null,
     @SerialName("end_time") val endTime: String? = null,
-    val score: Int? = null,
+    val score: Double? = null,
     val status: String,
     @SerialName("config_json") val configJson: String? = null,
     @SerialName("ai_questions_json") val aiQuestionsJson: String? = null,
@@ -157,11 +161,19 @@ data class InterviewSessionResponse(
 )
 
 @Serializable
+data class FeedbackData(
+    @SerialName("general_feedback") val generalFeedback: String,
+    val scores: Map<String, Int>,
+    val strengths: List<String>,
+    val improvements: List<String>
+)
+
+@Serializable
 data class InterviewSessionUpdateRequest(
     @SerialName("actual_duration") val actualDuration: Int? = null,
     @SerialName("start_time") val startTime: String? = null,
     @SerialName("end_time") val endTime: String? = null,
-    val score: Int? = null,
+    val score: Double? = null,
     val status: String? = null,
     @SerialName("config_json") val configJson: String? = null,
     @SerialName("feedback_json") val feedbackJson: String? = null,
@@ -212,16 +224,25 @@ interface ApiService {
         @Body request: InterviewSessionUpdateRequest
     ): InterviewSessionResponse
 
+    @GET("/api/v1/interview-sessions/{session_id}")
+    suspend fun getInterviewSession(@Path("session_id") sessionId: Int): InterviewSessionResponse
+
+    @GET("/api/v1/users/{user_id}/interview-sessions")
+    suspend fun getInterviewSessions(@Path("user_id") userId: Int): List<InterviewSessionResponse>
+
     @GET("/api/v1/text/{user_id}/{session_id}/{text}")
     suspend fun sendSTTText(
         @Path("user_id") userId: Int,
         @Path("session_id") sessionId: Int,
         @Path("text") text: String
     ): ResponseBody
+
+    @GET("/api/v1/debug/{content}")
+    suspend fun sendDebugLog(@Path("content") content: String): ResponseBody
 }
 
 object RetrofitClient {
-    private val json = Json { 
+    val json = Json {
         ignoreUnknownKeys = true 
         coerceInputValues = true
     }
