@@ -38,7 +38,7 @@ fun InterviewSetupScreen(
     val trainingModes = listOf("Tự do", "Cơ bản", "Theo đề")
     var selectedMode by remember { mutableStateOf(trainingModes[0]) }
 
-    val durations = listOf("15 Phút", "30 Phút", "45 Phút", "60 Phút")
+    val durations = listOf("3 Phút", "5 Phút", "10 Phút", "15 Phút", "30 Phút", "45 Phút", "60 Phút")
     var selectedDuration by remember { mutableStateOf(durations[1]) }
     var durationExpanded by remember { mutableStateOf(false) }
 
@@ -113,19 +113,6 @@ fun InterviewSetupScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
-                color = Color.White
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                }
-            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -262,6 +249,11 @@ fun InterviewSetupScreen(
                         errorMessage = null
                         try {
                             val durationValue = selectedDuration.split(" ")[0].toIntOrNull() ?: 30
+                            SessionManager.selectedDurationMinutes = durationValue
+                            SessionManager.jobTitle = jobTitle
+                            SessionManager.jobDescription = jobDescription
+                            SessionManager.language = selectedLanguage
+
                             val currentTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date())
                             
                             val response = RetrofitClient.apiService.createInterviewSession(
@@ -273,7 +265,7 @@ fun InterviewSetupScreen(
                                     mode = selectedMode,
                                     durationMinutes = durationValue,
                                     startTime = currentTime,
-                                    status = "completed",
+                                    status = "waited",
                                     configJson = jobDescription
                                 )
                             )

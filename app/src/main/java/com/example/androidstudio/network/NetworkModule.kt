@@ -57,6 +57,10 @@ object TokenHolder {
 
 object SessionManager {
     var sessionId: Int? = null
+    var selectedDurationMinutes: Int = 30
+    var jobTitle: String = ""
+    var jobDescription: String = ""
+    var language: String = "Tiếng Việt"
 }
 
 object SessionHistoryManager {
@@ -90,7 +94,7 @@ data class RegisterResponse(
     val email: String? = null,
     @SerialName("password_hash") val passwordHash: String? = null,
     @SerialName("google_id") val googleId: String? = null,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val created_at: String? = null
 )
 
 @Serializable
@@ -101,6 +105,7 @@ data class UserProfile(
     val major: String? = null,
     val experience: String? = null,
     val skills: String? = null,
+    val description: String? = null,
     val cv_url: String? = null,
     val cv_filename: String? = null
 )
@@ -111,7 +116,8 @@ data class ProfileUpdateRequest(
     val full_name: String,
     val major: String,
     val experience: String,
-    val skills: String
+    val skills: String,
+    val description: String
 )
 
 @Serializable
@@ -243,7 +249,7 @@ interface ApiService {
 
 object RetrofitClient {
     val json = Json {
-        ignoreUnknownKeys = true 
+        ignoreUnknownKeys = true
         coerceInputValues = true
     }
 

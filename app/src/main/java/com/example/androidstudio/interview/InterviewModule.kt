@@ -12,13 +12,15 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import com.example.androidstudio.network.InterviewSessionUpdateRequest
 import com.example.androidstudio.network.RetrofitClient
+import com.example.androidstudio.network.SessionManager
+import com.example.androidstudio.network.UserProfile
+import com.google.ai.client.generativeai.Chat
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,7 +30,7 @@ class InterviewModule(
     context: Context,
     private val userId: Int,
     private val sessionId: Int,
-    private val onResponseReceived: (String, String) -> Unit, // Trả về Question và Hint
+    private val onResponseReceived: (String, String) -> Unit,
     private val onUserSpeechRecognized: (String) -> Unit,
     private val onListeningStateChanged: (Boolean) -> Unit,
     private val onError: (String) -> Unit
@@ -38,37 +40,23 @@ class InterviewModule(
     private val apiKey = "AIzaSyBNEMjxd6_JM-CmJ988yPDLtSEVqry5eJE"
     private val modelName = "gemini-2.5-flash"
 
-    private val generativeModel = GenerativeModel(
-        modelName = modelName,
-        apiKey = apiKey,
-        systemInstruction = content {
-            text("Bạn là một người phỏng vấn chuyên nghiệp. " +
-                    "Mỗi phản hồi của bạn PHẢI LUÔN là một đối tượng JSON có định dạng chính xác sau: " +
-                    "{\"question\": \"nội dung câu hỏi\", \"hint\": \"gợi ý trả lời ngắn gọn\"}. " +
-                    "Không bao gồm bất kỳ văn bản nào khác ngoài JSON. " +
-                    "Hãy đặt từng câu hỏi một. Sau khi ứng viên trả lời, hãy nhận xét ngắn gọn và đặt câu hỏi tiếp theo.")
-        }
-    )
-
-    private val chat = generativeModel.startChat()
+    private var generativeModel: GenerativeModel? = null
+    private var chat: Chat? = null
     private val scope = CoroutineScope(Dispatchers.Main)
     
-    // Biến lưu trữ lịch sử cuộc hội thoại
     private val conversationHistory = mutableListOf<JSONObject>()
-
     private val speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(appContext)
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
     private var pendingText: String? = null
 
     private val handler = Handler(Looper.getMainLooper())
-    private val silenceRunnable = Runnable {
-        stopListening()
-    }
+    private val silenceRunnable = Runnable { stopListening() }
 
     private val recognizerIntent: Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+        val lang = if (SessionManager.language == "Tiếng Anh") "en-US" else "vi-VN"
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
     }
 
@@ -79,7 +67,7 @@ class InterviewModule(
 
     private fun resetSilenceTimer() {
         handler.removeCallbacks(silenceRunnable)
-        handler.postDelayed(silenceRunnable, 2000)
+        handler.postDelayed(silenceRunnable, 5000)
     }
 
     private fun cancelSilenceTimer() {
@@ -89,12 +77,70 @@ class InterviewModule(
     fun connect() {
         scope.launch {
             try {
-                val response = chat.sendMessage("Bắt đầu buổi phỏng vấn. Hãy chào ứng viên và đặt câu hỏi đầu tiên.")
-                parseAndEmitResponse(response.text)
+                // 1. Lấy thông tin Profile người dùng
+                val profile = try {
+                    RetrofitClient.apiService.getUserProfile(userId)
+                } catch (e: Exception) {
+                    UserProfile(full_name = "Ứng viên") // Fallback nếu lỗi profile
+                }
+                
+                // 2. Xây dựng instruction và khởi tạo Model
+                val instruction = buildSystemInstruction(profile)
+                generativeModel = GenerativeModel(
+                    modelName = modelName,
+                    apiKey = apiKey,
+                    systemInstruction = content { text(instruction) }
+                )
+                
+                chat = generativeModel?.startChat()
+
+                // 3. Gửi prompt khởi đầu
+                val startPrompt = if (SessionManager.language == "Tiếng Anh") {
+                    "Begin the interview. Introduce yourself as an AI character named \"AI Interviewer\" conducting the interview today, then greet me and ask me to introduce myself and my experience. Then, based on the information I provide about the position, job description, and my experience, formulate interview questions."
+                } else {
+                    "Bắt đầu buổi phỏng vấn. Hãy giới thiệu mình là 1 nhân vật AI tên là \"AI Interviewer\" thực hiện phỏng vấn tôi ngày hôm nay, sau đó chào tôi và yêu cầu tôi giới thiệu bản thân và kinh nghiệm. Sau đó hãy dựa vào thông tin của tôi cung cấp về vị trí ứng tuyển, mô tả công việc và kinh nghiệm của tôi để đưa ra các câu hỏi phỏng vấn"
+                }
+                
+                val response = chat?.sendMessage(startPrompt)
+                parseAndEmitResponse(response?.text)
             } catch (e: Exception) {
-                onError("Lỗi kết nối Gemini: ${e.message}")
+                onError("Lỗi kết nối AI: ${e.message}")
             }
         }
+    }
+
+    private fun buildSystemInstruction(profile: UserProfile): String {
+        val language = SessionManager.language
+        val jobTitle = SessionManager.jobTitle
+        val jobDesc = SessionManager.jobDescription
+        
+        val userMajor = profile.major ?: "N/A"
+        val userExp = profile.experience ?: "N/A"
+        val userSkills = profile.skills ?: "N/A"
+        val userName = profile.full_name ?: "Ứng viên"
+        val userDescription = profile.description ?: "N/A"
+
+        return """
+            Bạn là một chuyên gia phỏng vấn chuyên nghiệp cho vị trí: $jobTitle.
+            Mô tả công việc: $jobDesc
+            
+            Thông tin ứng viên:
+            - Tên: $userName
+            - Chuyên ngành: $userMajor
+            - Kinh nghiệm: $userExp
+            - Kỹ năng: $userSkills
+            - Câu hỏi thêm: $userDescription
+            
+            YÊU CẦU:
+            1. Đặt câu hỏi dựa trên sự kết hợp giữa Mô tả công việc và Hồ sơ ứng viên.
+            2. Kiểm tra các kỹ năng thực tế.
+            3. Ngôn ngữ: $language.
+            
+            QUY ĐỊNH PHẢN HỒI:
+            - PHẢI LUÔN TRẢ VỀ JSON: {"question": "nội dung", "hint": "gợi ý ngắn"}
+            - KHÔNG ĐƯỢC có văn bản thừa ngoài JSON.
+            - Đặt từng câu hỏi một. Sau khi nghe trả lời, nhận xét ngắn rồi hỏi câu tiếp.
+        """.trimIndent()
     }
 
     private fun saveToHistory(role: String, content: String) {
@@ -104,28 +150,12 @@ class InterviewModule(
             entry.put("content", content)
             conversationHistory.add(entry)
         } catch (e: Exception) {
-            Log.e("InterviewModule", "Error saving to history: ${e.message}")
+            Log.e("InterviewModule", "Error saving history: ${e.message}")
         }
     }
 
-    private fun sendDebugInfo() {
-        if (conversationHistory.isEmpty()) return
-        /*
-        val historyJson = conversationHistory.toString()
-        scope.launch(Dispatchers.IO) {
-            try {
-                val encodedContent = URLEncoder.encode(historyJson, "UTF-8")
-                RetrofitClient.apiService.sendDebugLog(encodedContent)
-                Log.d("InterviewModule", "Debug info sent successfully")
-            } catch (e: Exception) {
-                Log.e("InterviewModule", "Failed to send debug log: ${e.message}")
-            }
-        }
-                
-         */
-    }
-
-    private fun analyzeAndSaveFeedback() {
+    fun analyzeAndSaveFeedback() {
+        val model = generativeModel ?: return
         if (conversationHistory.isEmpty()) return
 
         scope.launch(Dispatchers.IO) {
@@ -135,26 +165,16 @@ class InterviewModule(
                 }
 
                 val prompt = """
-                    Bạn là một chuyên gia tuyển dụng. Hãy đánh giá cuộc phỏng vấn sau đây và trả về một đối tượng JSON duy nhất.
-                    Lịch sử cuộc phỏng vấn:
-                    $historyText
-                    
-                    Định dạng JSON yêu cầu:
+                    Đánh giá cuộc phỏng vấn vị trí ${SessionManager.jobTitle}. Trả về JSON:
                     {
-                      "general_feedback": "nhận xét chung dạng văn bản",
-                      "scores": {
-                        "problem_solving": 0-10,
-                        "knowledge": 0-10,
-                        "communication": 0-10,
-                        "soft_skills": 0-10
-                      },
-                      "strengths": ["điểm mạnh 1", "điểm mạnh 2"],
-                      "improvements": ["cần cải thiện 1", "cần cải thiện 2"]
+                      "general_feedback": "nhận xét bằng ${SessionManager.language}",
+                      "scores": {"problem_solving": 0-10, "knowledge": 0-10, "communication": 0-10, "soft_skills": 0-10},
+                      "strengths": [], "improvements": []
                     }
-                    Chỉ trả về JSON, không thêm bất kỳ văn bản nào khác.
+                    Lịch sử: $historyText
                 """.trimIndent()
 
-                val response = generativeModel.generateContent(prompt)
+                val response = model.generateContent(prompt)
                 val feedbackJsonStr = response.text?.let { text ->
                     val start = text.indexOf("{")
                     val end = text.lastIndexOf("}") + 1
@@ -164,27 +184,22 @@ class InterviewModule(
                 if (feedbackJsonStr != null) {
                     val feedbackObj = JSONObject(feedbackJsonStr)
                     val scores = feedbackObj.getJSONObject("scores")
-                    val totalScore = scores.optDouble("problem_solving", 0.0) +
-                                   scores.optDouble("knowledge", 0.0) +
-                                   scores.optDouble("communication", 0.0) +
-                                   scores.optDouble("soft_skills", 0.0)
-                    val avgScore = totalScore / 4.0
+                    val avgScore = (scores.optDouble("problem_solving") + scores.optDouble("knowledge") + 
+                                   scores.optDouble("communication") + scores.optDouble("soft_skills")) / 4.0
 
                     val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
                     sdf.timeZone = TimeZone.getTimeZone("UTC")
-                    val currentTime = sdf.format(Date())
 
                     val updateRequest = InterviewSessionUpdateRequest(
                         status = "completed",
                         feedbackJson = feedbackJsonStr,
-                        endTime = currentTime,
+                        endTime = sdf.format(Date()),
                         score = avgScore
                     )
                     RetrofitClient.apiService.updateInterviewSession(sessionId, updateRequest)
-                    Log.d("InterviewModule", "Feedback and end time saved successfully. Score: $avgScore")
                 }
             } catch (e: Exception) {
-                Log.e("InterviewModule", "Error during analysis: ${e.message}")
+                Log.e("InterviewModule", "Analysis error: ${e.message}")
             }
         }
     }
@@ -192,8 +207,6 @@ class InterviewModule(
     private fun parseAndEmitResponse(text: String?) {
         try {
             if (text == null) return
-            
-            // Tìm JSON trong chuỗi trả về
             val jsonStart = text.indexOf("{")
             val jsonEnd = text.lastIndexOf("}") + 1
             if (jsonStart != -1 && jsonEnd != -1) {
@@ -266,17 +279,19 @@ class InterviewModule(
         saveToHistory("user", answer)
         scope.launch {
             try {
-                val response = chat.sendMessage(answer)
-                parseAndEmitResponse(response.text)
+                val response = chat?.sendMessage(answer)
+                parseAndEmitResponse(response?.text)
             } catch (e: Exception) {
-                onError("Lỗi AI: ${e.message}")
+                onError("AI Error: ${e.message}")
             }
         }
     }
 
     fun speak(text: String) {
-        if (isTtsReady) {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "InterviewTTS")
+        if (isTtsReady && tts != null) {
+            tts?.setSpeechRate(1.2f)
+
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utteranceId")
         } else {
             pendingText = text
         }
@@ -284,21 +299,19 @@ class InterviewModule(
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts?.setLanguage(Locale("vi", "VN"))
+            val locale = if (SessionManager.language == "Tiếng Anh") Locale.US else Locale("vi", "VN")
+            tts?.setLanguage(locale)
             isTtsReady = true
             pendingText?.let {
                 speak(it)
-                pendingText = null
             }
         }
     }
 
     fun disconnect() {
-        sendDebugInfo()
-        analyzeAndSaveFeedback() // Phân tích và lưu feedback khi kết thúc
-        cancelSilenceTimer()
-        speechRecognizer.destroy()
         tts?.stop()
         tts?.shutdown()
+        speechRecognizer.destroy()
+        cancelSilenceTimer()
     }
 }

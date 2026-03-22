@@ -24,6 +24,7 @@ fun CreateProfileScreen(
     var major by remember { mutableStateOf("") }
     var experience by remember { mutableStateOf("") }
     var skills by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
@@ -91,6 +92,16 @@ fun CreateProfileScreen(
                 shape = RoundedCornerShape(8.dp)
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Mô tả bản thân") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+
             if (errorMessage != null) {
                 Text(
                     text = errorMessage!!,
@@ -107,7 +118,7 @@ fun CreateProfileScreen(
                         isLoading = true
                         errorMessage = null
                         try {
-                            val request = ProfileUpdateRequest(userId, fullName, major, experience, skills)
+                            val request = ProfileUpdateRequest(userId, fullName, major, experience, skills, description)
                             RetrofitClient.apiService.createProfile(request)
                             onCreateSuccess()
                         } catch (e: Exception) {

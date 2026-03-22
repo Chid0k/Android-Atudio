@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.androidstudio.interview.InterviewModule
+import com.example.androidstudio.network.SessionManager
+import kotlinx.coroutines.delay
 
 @Composable
 fun InterviewScreen(
@@ -44,6 +46,11 @@ fun InterviewScreen(
 
     var isQuestionVisible by remember { mutableStateOf(true) }
     var isHintVisible by remember { mutableStateOf(true) }
+
+    // Countdown Timer State
+    var remainingTime by remember { 
+        mutableStateOf(SessionManager.selectedDurationMinutes * 60) 
+    }
 
     val interviewModule = remember {
         if (userId != null && sessionId != null) {
@@ -69,6 +76,18 @@ fun InterviewScreen(
             )
         } else {
             null
+        }
+    }
+
+    // Timer logic
+    LaunchedEffect(remainingTime) {
+        if (remainingTime > 0) {
+            delay(1000L)
+            remainingTime--
+        } else {
+            interviewModule?.analyzeAndSaveFeedback()
+            interviewModule?.disconnect()
+            onEndInterview()
         }
     }
 
@@ -107,19 +126,42 @@ fun InterviewScreen(
             Text("Interviewer Video", color = Color.White, modifier = Modifier.align(Alignment.Center))
         }
 
-        // Recording Indicator
-        if (isListening) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color.Green.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+        // Top Row for Timer and Recording Indicator
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Timer Display
+            val minutes = remainingTime / 60
+            val seconds = remainingTime % 60
+            Surface(
+                color = Color.Black.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Đang nghe...", color = Color.White, fontSize = 12.sp)
+                Text(
+                    text = String.format("%02d:%02d", minutes, seconds),
+                    color = if (remainingTime < 60) Color.Red else Color.White,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Recording Indicator
+            if (isListening) {
+                Row(
+                    modifier = Modifier
+                        .background(Color.Green.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Đang nghe...", color = Color.White, fontSize = 12.sp)
+                }
             }
         }
 
@@ -284,6 +326,7 @@ fun InterviewScreen(
             // End call
             IconButton(
                 onClick = {
+                    interviewModule?.analyzeAndSaveFeedback()
                     interviewModule?.disconnect()
                     onEndInterview()
                 },

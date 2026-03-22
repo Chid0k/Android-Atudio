@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,11 +48,14 @@ fun ResultAnalysisScreen(
     var feedbackData by remember { mutableStateOf<FeedbackData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var retryTrigger by remember { mutableStateOf(0) }
 
-    LaunchedEffect(userId, sessionId) {
+    LaunchedEffect(userId, sessionId, retryTrigger) {
         if (userId != null) {
+            isLoading = true
+            error = null
             try {
-                // Chỉ delay khi đi từ màn hình phỏng vấn
+                // Chỉ delay khi đi từ màn hình phỏng vấn ở lần đầu hoặc khi retry
                 if (isFromInterview) {
                     delay(10000)
                 }
@@ -65,7 +69,7 @@ fun ResultAnalysisScreen(
 
                 if (session != null) {
                     val feedbackJson = session.feedbackJson
-                    if (feedbackJson != null) {
+                    if (!feedbackJson.isNullOrBlank()) {
                         try {
                             val json = Json { ignoreUnknownKeys = true }
                             feedbackData = json.decodeFromString<FeedbackData>(feedbackJson)
@@ -74,7 +78,7 @@ fun ResultAnalysisScreen(
                             error = "Không thể phân tích dữ liệu đánh giá."
                         }
                     } else {
-                        error = "Không tìm thấy dữ liệu đánh giá cho buổi phỏng vấn này."
+                        error = "Không tìm thấy dữ liệu đánh giá. AI có thể đang xử lý, vui lòng thử lại sau giây lát."
                     }
                 } else {
                     error = "Không tìm thấy thông tin buổi phỏng vấn."
@@ -121,7 +125,24 @@ fun ResultAnalysisScreen(
             }
         } else if (error != null) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(error!!, color = Color.Red, textAlign = TextAlign.Center)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(error!!, color = Color.Red, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { retryTrigger++ },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E3C3E)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Tải lại")
+                    }
+                }
             }
         } else if (feedbackData != null) {
             val data = feedbackData!!

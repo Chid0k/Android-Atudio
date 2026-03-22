@@ -28,6 +28,7 @@ fun EditProfileScreen(
     var major by remember { mutableStateOf("") }
     var experience by remember { mutableStateOf("") }
     var skills by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -43,6 +44,7 @@ fun EditProfileScreen(
                 major = profile.major ?: ""
                 experience = profile.experience ?: ""
                 skills = profile.skills ?: ""
+                description = profile.description ?: ""
             } catch (e: Exception) {
                 errorMessage = "Không thể tải thông tin: ${e.localizedMessage}"
             } finally {
@@ -85,6 +87,9 @@ fun EditProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 EditField(label = "Kỹ năng", value = skills, onValueChange = { skills = it })
+                Spacer(modifier = Modifier.height(16.dp))
+
+                EditField(label = "Mô tả bản thân", value = description, onValueChange = { description = it })
                 
                 if (errorMessage != null) {
                     Text(
@@ -108,7 +113,8 @@ fun EditProfileScreen(
                                         full_name = name,
                                         major = major,
                                         experience = experience,
-                                        skills = skills
+                                        skills = skills,
+                                        description = description
                                     )
                                     RetrofitClient.apiService.updateProfile(userId, request)
                                     onNavigateBack()
