@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.navigation.NavType
+import com.example.androidstudio.network.QuizCategory
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -28,6 +29,9 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val navController = rememberNavController()
     var loggedInUserId by remember { mutableStateOf<Int?>(null) }
+    var selectedQuizCategory by remember { mutableStateOf<QuizCategory?>(null) }
+    var quizQuestionCount by remember { mutableIntStateOf(10) }
+    var quizTimeLimit by remember { mutableStateOf<Int?>(5) }
 
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
@@ -104,8 +108,39 @@ fun MainApp() {
                 onNavigateToHistory = { navController.navigate("history") },
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToInterviewSetup = { navController.navigate("interview_setup") },
-                onNavigateToArticle = { index -> navController.navigate("article_detail/$index") }
+                onNavigateToArticle = { index -> navController.navigate("article_detail/$index") },
+                onNavigateToQuizSetup = { category ->
+                    selectedQuizCategory = category
+                    navController.navigate("quiz_setup")
+                }
             )
+        }
+        composable("quiz_setup") {
+            selectedQuizCategory?.let { category ->
+                QuizSetupScreen(
+                    category = category,
+                    onNavigateBack = { navController.popBackStack() },
+                    onStartQuiz = { count, timeLimit ->
+                        quizQuestionCount = count
+                        quizTimeLimit = timeLimit
+                        navController.navigate("quiz")
+                    }
+                )
+            }
+        }
+        composable("quiz") {
+            selectedQuizCategory?.let { category ->
+                QuizScreen(
+                    category = category,
+                    questionCount = quizQuestionCount,
+                    timeLimitMinutes = quizTimeLimit,
+                    onQuizComplete = { score, total ->
+                        // Show result screen
+                        navController.popBackStack("home", inclusive = false)
+                    },
+                    onExit = { navController.popBackStack() }
+                )
+            }
         }
         composable(
             route = "article_detail/{articleIndex}",

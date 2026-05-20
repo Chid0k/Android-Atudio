@@ -21,11 +21,11 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ModernTabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val containerColor by animateColorAsState(
-        if (isSelected) Color.White else Color.Transparent,
+        if (isSelected) Color(0xFF0D3B34) else Color.Transparent,
         animationSpec = tween(durationMillis = 300), label = ""
     )
     val contentColor by animateColorAsState(
-        if (isSelected) Color(0xFF0D3B34) else Color.Gray,
+        if (isSelected) Color.White else Color.Gray,
         animationSpec = tween(durationMillis = 300), label = ""
     )
 
@@ -34,8 +34,7 @@ fun ModernTabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifi
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         color = containerColor,
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = if (isSelected) 4.dp else 0.dp
+        shape = RoundedCornerShape(12.dp)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
             Text(
