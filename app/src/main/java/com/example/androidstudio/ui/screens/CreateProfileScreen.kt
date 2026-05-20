@@ -75,16 +75,6 @@ fun CreateProfileScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = experience,
-                onValueChange = { experience = it },
-                label = { Text("Kinh nghiệm") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
                 value = skills,
                 onValueChange = { skills = it },
                 label = { Text("Kỹ năng") },

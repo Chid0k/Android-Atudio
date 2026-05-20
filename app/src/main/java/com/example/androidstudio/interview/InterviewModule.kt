@@ -133,8 +133,9 @@ class InterviewModule(
             
             YÊU CẦU:
             1. Đặt câu hỏi dựa trên sự kết hợp giữa Mô tả công việc và Hồ sơ ứng viên.
-            2. Kiểm tra các kỹ năng thực tế.
-            3. Ngôn ngữ: $language.
+            2. Đặt các câu hỏi tình huồng làm việc thực tế xen kẽ các câu hỏi kiến thức 
+            3. Kiểm tra các kỹ năng vào tình huống làm việc thực tế.
+            4. Ngôn ngữ: $language.
             
             QUY ĐỊNH PHẢN HỒI:
             - PHẢI LUÔN TRẢ VỀ JSON: {"question": "nội dung", "hint": "gợi ý ngắn"}

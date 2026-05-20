@@ -32,10 +32,10 @@ fun InterviewSetupScreen(
     onNavigateBack: () -> Unit,
     onStartInterview: () -> Unit
 ) {
-    var jobTitle by remember { mutableStateOf("Senior UX Designer") }
-    var jobDescription by remember { mutableStateOf("Mô tả công việc, yêu cầu công việc...") }
+    var jobTitle by remember { mutableStateOf("Junior Pentester") }
+    var jobDescription by remember { mutableStateOf("Kiểm thử xâm nhập ứng dụng web") }
     
-    val trainingModes = listOf("Tự do", "Cơ bản", "Theo đề")
+    val trainingModes = listOf("Tự do", "Cơ bản", "Nâng cao")
     var selectedMode by remember { mutableStateOf(trainingModes[0]) }
 
     val durations = listOf("3 Phút", "5 Phút", "10 Phút", "15 Phút", "30 Phút", "45 Phút", "60 Phút")

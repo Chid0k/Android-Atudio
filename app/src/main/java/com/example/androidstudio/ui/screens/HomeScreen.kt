@@ -28,6 +28,7 @@ import com.example.androidstudio.ui.components.BottomNavigationBar
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.OffsetDateTime
 import java.time.Duration
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,24 +62,12 @@ fun HomeScreen(
 
     // Calculate statistics
     val totalSessions = sessions.size
-    val totalDurationMinutes = sessions.sumOf { session ->
-        if (session.startTime != null && session.endTime != null) {
-            try {
-                val formatter = DateTimeFormatter.ISO_DATE_TIME
-                val start = LocalDateTime.parse(session.startTime, formatter)
-                val end = LocalDateTime.parse(session.endTime, formatter)
-                Duration.between(start, end).toMinutes().toInt()
-            } catch (e: Exception) {
-                0
-            }
-        } else {
-            0
-        }
-    }
+    val totalDurationMinutes = 0
 
-    val hours = totalDurationMinutes / 60
-    val minutes = totalDurationMinutes % 60
-    val durationText = if (hours > 0) "${hours}h ${minutes}p" else "${minutes}p"
+
+
+    // val durationText = if (hours > 0) "${hours}h ${minutes}p" else "${minutes}p"
+    val durationText = sessions.maxOfOrNull { it.score?.toDouble() ?: 0.0 } ?: 0.0
 
     val recentSessions = sessions.take(2)
 
@@ -114,7 +103,7 @@ fun HomeScreen(
             item {
                 HomeHeader(userProfile, onNavigateToProfile)
                 Spacer(modifier = Modifier.height(24.dp))
-                StatCards(durationText, totalSessions.toString())
+                StatCards(durationText.toString(), totalSessions.toString())
                 Spacer(modifier = Modifier.height(24.dp))
                 StartInterviewBanner(onNavigateToInterviewSetup)
                 Spacer(modifier = Modifier.height(24.dp))
@@ -177,7 +166,7 @@ fun StatCards(duration: String, sessionsCount: String) {
         StatCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Timer,
-            label = "Đã luyện",
+            label = "Điểm cao nhất",
             value = duration
         )
         StatCard(

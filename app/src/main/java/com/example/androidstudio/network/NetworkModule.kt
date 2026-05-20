@@ -47,8 +47,25 @@ data class ArticleDetailResponse(
     val article: KnowledgeArticle
 )
 
+@Serializable
+data class QuizQuestion(
+    val id: Int,
+    val question: String,
+    val options: List<String>,
+    @SerialName("correct_answer_index") val correctAnswerIndex: Int,
+    val explanation: String? = null,
+    @SerialName("review_suggestion") val reviewSuggestion: String? = null
+)
+
+@Serializable
+data class QuizCategory(
+    val category: String,
+    @SerialName("total_questions") val totalQuestions: Int,
+    val questions: List<QuizQuestion>
+)
+
 object NetworkConfig {
-    const val BASE_URL = "http://192.168.0.104:8000"
+    const val BASE_URL = "http://172.20.10.2:8000"
 }
 
 object TokenHolder {

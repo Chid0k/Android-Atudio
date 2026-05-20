@@ -1,18 +1,22 @@
 package com.example.androidstudio.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.androidstudio.R
 import com.example.androidstudio.network.LoginRequest
 import com.example.androidstudio.network.RetrofitClient
 import kotlinx.coroutines.launch
@@ -44,14 +48,16 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Logo Placeholder
-                Surface(
-                    modifier = Modifier.size(80.dp),
-                    color = Color(0xFF0E3C3E),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    // Icon would go here
-                }
+                // Logo
+                Image(
+                    painter = painterResource(id = R.drawable.icon),
+                    contentDescription = "AI Interview Logo",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .padding(bottom = 16.dp),
+                    contentScale = ContentScale.Fit
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -112,6 +118,7 @@ fun LoginScreen(
                         scope.launch {
                             isLoading = true
                             errorMessage = null
+                            /*
                             try {
                                 val loginResponse = RetrofitClient.apiService.login(
                                     LoginRequest(email, password)
@@ -135,8 +142,10 @@ fun LoginScreen(
                                 errorMessage = "Đăng nhập thất bại: ${e.localizedMessage}"
                             } finally {
                                 isLoading = false
-                            }
+                            } */
+                            onLoginSuccess(1);
                         }
+
                     },
                     modifier = Modifier
                         .fillMaxWidth()

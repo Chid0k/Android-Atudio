@@ -5,32 +5,34 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.androidstudio.R
 import com.example.androidstudio.interview.InterviewModule
 import com.example.androidstudio.network.SessionManager
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InterviewScreen(
     userId: Int?,
@@ -44,8 +46,8 @@ fun InterviewScreen(
     var isListening by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    var isQuestionVisible by remember { mutableStateOf(true) }
     var isHintVisible by remember { mutableStateOf(true) }
+    var isQuestionVisible by remember { mutableStateOf(true) }
 
     // Countdown Timer State
     var remainingTime by remember { 
@@ -120,232 +122,291 @@ fun InterviewScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Placeholder for Interviewer Video
-        Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray)) {
-            Text("Interviewer Video", color = Color.White, modifier = Modifier.align(Alignment.Center))
-        }
-
-        // Top Row for Timer and Recording Indicator
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Timer Display
-            val minutes = remainingTime / 60
-            val seconds = remainingTime % 60
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = onEndInterview) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { isQuestionVisible = !isQuestionVisible }) {
+                        Icon(
+                            imageVector = if (isQuestionVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = "Toggle Question Visibility",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        bottomBar = {
             Surface(
-                color = Color.Black.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 16.dp
             ) {
-                Text(
-                    text = String.format("%02d:%02d", minutes, seconds),
-                    color = if (remainingTime < 60) Color.Red else Color.White,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Recording Indicator
-            if (isListening) {
                 Row(
                     modifier = Modifier
-                        .background(Color.Green.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Đang nghe...", color = Color.White, fontSize = 12.sp)
-                }
-            }
-        }
-
-        // Top Info Area (Questions & Hints)
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .width(280.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Interviewer Question Card
-            AnimatedVisibility(visible = isQuestionVisible) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Người phỏng vấn AI", fontWeight = FontWeight.Bold, color = Color.Black)
-                        Text(
-                            interviewerQuestion,
-                            fontSize = 14.sp,
-                            color = Color.Black,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        if (errorMessage != null) {
-                            Text(
-                                errorMessage!!,
-                                color = Color.Red,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Hint Card
-            AnimatedVisibility(visible = isHintVisible && interviewerHint.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Yellow.copy(alpha = 0.8f)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text("Gợi ý", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
-                            Text(
-                                interviewerHint,
-                                fontSize = 13.sp,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sidebar Toggles (Question & Hint)
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Toggle Question
-            IconButton(
-                onClick = { isQuestionVisible = !isQuestionVisible },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        if (isQuestionVisible) Color.Blue.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.3f),
-                        CircleShape
+                    BottomControlButton(
+                        icon = if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
+                        label = "MIC",
+                        onClick = {
+                            if (hasAudioPermission) {
+                                if (isListening) {
+                                    interviewModule?.stopListening()
+                                } else {
+                                    userSpeechText = ""
+                                    interviewModule?.startListening()
+                                }
+                            } else {
+                                launcher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        isActive = isListening
                     )
-            ) {
-                Icon(Icons.Default.Help, contentDescription = "Ẩn/Hiện câu hỏi", tint = Color.White)
-            }
 
-            // Toggle Hint
-            IconButton(
-                onClick = { isHintVisible = !isHintVisible },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        if (isHintVisible) Color.Yellow.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.3f),
-                        CircleShape
+                    BottomControlButton(
+                        icon = Icons.Default.Videocam,
+                        label = "VIDEO",
+                        onClick = { /* Mock */ }
                     )
-            ) {
-                Icon(Icons.Default.Lightbulb, contentDescription = "Ẩn/Hiện gợi ý", tint = Color.White)
+
+                    BottomControlButton(
+                        icon = Icons.Default.AutoAwesome,
+                        label = "TIPS",
+                        onClick = { isHintVisible = !isHintVisible },
+                        isActive = isHintVisible,
+                        activeColor = Color(0xFF007AFF)
+                    )
+
+                    BottomControlButton(
+                        icon = Icons.Default.CallEnd,
+                        label = "EXIT",
+                        onClick = {
+                            interviewModule?.analyzeAndSaveFeedback()
+                            interviewModule?.disconnect()
+                            onEndInterview()
+                        },
+                        containerColor = Color(0xFFE74C3C),
+                        contentColor = Color.White
+                    )
+                }
             }
         }
-
-        // User PIP (Picture-in-Picture) with Speech Text
+    ) { padding ->
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 100.dp)
-                .size(150.dp, 200.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.Gray.copy(alpha = 0.6f))
+                .padding(padding)
+                .fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(8.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                if (userSpeechText.isNotEmpty()) {
-                    Text(
-                        userSpeechText,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                            .padding(4.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Bạn", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
-            }
-        }
-
-        // Bottom Controls
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Mic toggle
-            IconButton(
-                onClick = {
-                    if (hasAudioPermission) {
-                        if (isListening) {
-                            interviewModule?.stopListening()
-                        } else {
-                            userSpeechText = "" // Reset text khi bắt đầu nghe mới
-                            interviewModule?.startListening()
-                        }
-                    } else {
-                        launcher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
+            // Background / Interviewer Avatar Area
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        if (isListening) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.3f),
-                        CircleShape
-                    )
+                    .fillMaxSize()
+                    .background(Color(0xFF1A1A1A))
             ) {
-                Icon(
-                    if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
-                    contentDescription = null,
-                    tint = Color.White
+                Image(
+                    painter = painterResource(id = R.drawable.background),
+                    contentDescription = "AI Interviewer",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             }
 
-            // End call
-            IconButton(
-                onClick = {
-                    interviewModule?.analyzeAndSaveFeedback()
-                    interviewModule?.disconnect()
-                    onEndInterview()
-                },
+            Column(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(Color.Red, CircleShape)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
             ) {
-                Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
-            }
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Question Card
+                AnimatedVisibility(visible = isQuestionVisible) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1D2D).copy(alpha = 0.9f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "CURRENT QUESTION",
+                                    color = Color(0xFF3B82F6),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                Surface(
+                                    color = Color(0xFF1E3A34),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(if (isListening) Color(0xFF22C55E) else Color.Gray, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        val minutes = remainingTime / 60
+                                        val seconds = remainingTime % 60
+                                        Text(
+                                            text = String.format("%02d:%02d", minutes, seconds),
+                                            color = Color(0xFF22C55E),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Text(
+                                text = if (interviewerQuestion.startsWith("\"")) interviewerQuestion else "\"$interviewerQuestion\"",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                lineHeight = 24.sp
+                            )
+                        }
+                    }
+                }
 
-            // Camera toggle (Mock)
-            IconButton(
-                onClick = {},
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(Color.White.copy(alpha = 0.3f), CircleShape)
-            ) {
-                Icon(Icons.Default.Videocam, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.weight(1f))
+
+                // User Speech Bubble
+                if (userSpeechText.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .padding(bottom = 16.dp, end = 60.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp)
+                    ) {
+                        Text(
+                            text = "\"$userSpeechText\"",
+                            modifier = Modifier.padding(12.dp),
+                            fontSize = 14.sp,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            color = Color.DarkGray
+                        )
+                    }
+                }
+
+                // Expert Insight Card
+                AnimatedVisibility(visible = isHintVisible && interviewerHint.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Surface(
+                                color = Color(0xFFE9F2FF),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Lightbulb,
+                                    contentDescription = null,
+                                    tint = Color(0xFF3B82F6),
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "EXPERT INSIGHT",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    IconButton(
+                                        onClick = { isHintVisible = false },
+                                        modifier = Modifier.size(16.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = Color.LightGray
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = interviewerHint,
+                                    fontSize = 13.sp,
+                                    color = Color.DarkGray,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+fun BottomControlButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    containerColor: Color = Color(0xFFE9EEF5),
+    contentColor: Color = Color(0xFF374151),
+    isActive: Boolean = false,
+    activeColor: Color = Color(0xFF007AFF)
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(52.dp)
+                .background(if (isActive) activeColor else containerColor, CircleShape)
+        ) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = if (isActive || containerColor != Color(0xFFE9EEF5)) Color.White else contentColor
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isActive) activeColor else Color.Gray
+        )
     }
 }
